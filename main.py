@@ -22,7 +22,10 @@ framerate = 5.0
 webcam_size = (320,240)
 
 validPicPath = "valid/"
-#peopleID = 334
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+cascade_scale = 1.1
+cascade_neighbors = 8
+minFaceSize = (90,100)
 
 #---------------------------------------------------------
 def createEnv():
@@ -42,9 +45,26 @@ def createEnv():
     #    os.makedirs(validPicPath+str(peopleID) + "/cam1")
     #    print("Pics for valid user path created:", validPicPath+str(peopleID)+"/cam1")
 
+def getFaces_cascade(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(
+        gray,
+        scaleFactor= cascade_scale,
+        minNeighbors=cascade_neighbors,
+        minSize=minFaceSize,
+        flags=cv2.CASCADE_SCALE_IMAGE
+    )
+
+    bboxes = []
+    for (x,y,w,h) in faces:
+        if(w>minFaceSize[0] and h>minFaceSize[1]):
+            bboxes.append((x, y, w, h))
+
+    return bboxes
+
 def chkID(id):
     if not os.path.exists(validPicPath + str(id)):
-        easygui.msgbox('您的ID{}還沒有申請刷臉打卡哦！'.format(id))
+        easygui.msgbox('這個ID{}還沒有申請刷臉打卡！'.format(id))
         return False
     else:
         if(os.path.exists(validPicPath + str(id) + '/cam0/valid.jpg') and \
@@ -185,6 +205,9 @@ def createID(id):
 
     key = 0
     takingPic = True
+    pic_cam0 = False   #has cam0 taken the pic?
+    pic_cam1 = False   #has cam1 taken the pic?
+
     while takingPic:
         for cameraID in [0,1]:
             hasFrame, infer_image = get_cameraimage(cameraID)
@@ -195,20 +218,32 @@ def createID(id):
                 break
 
             else:
-                if(cameraID==0):
-                    valid_pic = validated_image_filename0
-                else:
-                    valid_pic = validated_image_filename1
+                displayIMG = infer_image.copy()
+                bbox = getFaces_cascade(infer_image)
+                print("Faces", len(bbox))
+                if(len(bbox)>0):
+                    for (x,y,w,h) in bbox:
+                        cv2.rectangle( displayIMG,(x,y),(x+w,y+h),(0,255,0),2)
 
-                if(key==99):
-                    print("write:", valid_pic)
-                    cv2.imwrite(valid_pic, infer_image) 
-                    if(cameraID==1):
-                        easygui.msgbox('相片拍攝完畢！')
-                        takingPic = False
-                        break
+                    if(cameraID==0):
+                        valid_pic = validated_image_filename0
+                    else:
+                        valid_pic = validated_image_filename1
 
-            cv2.imshow("Camera #"+str(cameraID), infer_image)
+                    if(key==99):
+                        print("write:", valid_pic)
+                        cv2.imwrite(valid_pic, infer_image) 
+                        if(cameraID==0):
+                            pic_cam0 = True
+                        elif(cameraID==1):
+                            pic_cam1 = True
+
+                        if(pic_cam0 is True and pic_cam1 is True):
+                            easygui.msgbox('相片拍攝完畢！')
+                            takingPic = False
+                            break
+
+            cv2.imshow("Camera-"+str(cameraID), displayIMG)
 
             if(cameraID==1):
                 key = cv2.waitKey(1)
