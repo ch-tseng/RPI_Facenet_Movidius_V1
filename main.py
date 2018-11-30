@@ -6,7 +6,8 @@ import cv2
 import sys
 import os, time
 
-validated_image_filename = "validated_images/ch.tseng.jpg"
+validated_image_filename0 = "validated_images/ch.tseng0.jpg"
+validated_image_filename1 = "validated_images/ch.tseng1.jpg"
 
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 inputType = "webcam"  # webcam, image, video
@@ -18,7 +19,7 @@ FACE_MATCH_THRESHOLD = 1.2
 
 video_length = 600
 framerate = 5.0
-webcam_size = (960,640)
+webcam_size = (640,480)
 
 #---------------------------------------------------------
 def run_inference(image_to_classify, facenet_graph):
@@ -110,16 +111,45 @@ def handle_keys(raw_key):
 
     return True
 
+def get_cameraimage(id):
+    if(id==1):
+        hasFrame, infer_image = INPUT1.read()
+    else:
+        hasFrame, infer_image = INPUT0.read()
 
+    return hasFrame, infer_image
+
+def compare_img(nowImg, orgImg, objImg, camID):
+    matching = False
+    if (face_match(orgImg, test_output)):
+        matching = True
+    else:
+        matching = False
+
+    if(matching==True):
+        match_text = "#"+str(camID)+" Matched"
+    else:
+        match_text = "#"+str(camID)+" Not matched"
+
+    cv2.putText(objImg, match_text, (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
+    cv2.imshow("Camera-" + str(camID), objImg)
+    cv2.waitKey(1)
+
+    return matching
 
 start_time = time.time()
 
 if __name__ == "__main__":
 
     if(inputType == "webcam"):
-        INPUT = cv2.VideoCapture(0)
-        INPUT.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
-        INPUT.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
+        INPUT0 = cv2.VideoCapture(0)
+        INPUT0.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
+        INPUT0.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
+
+        INPUT1 = cv2.VideoCapture(1)
+        INPUT1.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
+        INPUT1.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
+
         width = webcam_size[0]
         height = webcam_size[1]
 
@@ -138,12 +168,12 @@ if __name__ == "__main__":
             out.release()
 
     else:
-        if(video_out!=""):
+        #if(video_out!=""):
             #width = int(INPUT.get(cv2.CAP_PROP_FRAME_WIDTH))   # float
             #height = int(INPUT.get(cv2.CAP_PROP_FRAME_HEIGHT)) # float
 
-            fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-            out = cv2.VideoWriter(video_out + str(time.time()) + ".avi",fourcc, framerate, (int(width),int(height)))
+            #fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+            #out = cv2.VideoWriter(video_out + str(time.time()) + ".avi",fourcc, framerate, (int(width),int(height)))
 
         frameID = 0
         record_time = time.time()
@@ -172,43 +202,25 @@ if __name__ == "__main__":
 
         #--Read the validate image -----------------------------------------------------------
 
-        validated_image = cv2.imread(validated_image_filename)
-        valid_output = run_inference(validated_image, graph)
+        validated_image0 = cv2.imread(validated_image_filename0)
+        validated_image1 = cv2.imread(validated_image_filename1)
+        valid_output0 = run_inference(validated_image0, graph)
+        valid_output1 = run_inference(validated_image1, graph)
         #----------------------------------------------------------
 
         while True:
             if(inputType == "webcam"):
-                hasFrame, frame = INPUT.read()
+                for cameraID in [0,1]:
+                    hasFrame, infer_image = get_cameraimage(cameraID)
 
-                if not hasFrame:
-                    print("Done processing !!!")
-                    print("--- %s seconds ---" % (time.time() - start_time))
-                    if(video_out!=""):
-                        out.release()
+                    print("#"+str(cameraID), hasFrame)
+                    if (not hasFrame):
+                        print("#"+str(cameraID)+" Done processing !!!")
+                        print("--- %s seconds ---" % (time.time() - start_time))
+                        #if(video_out!=""):
+                        #    out.release()
 
-                    break
+                        break
 
-                infer_image = frame.copy()
-                test_output = run_inference(infer_image, graph)
-
-                matching = False
-                if (face_match(valid_output, test_output)):
-                    matching = True
-                    text_color = (0, 255, 0)
-                    match_text = "MATCH"
-                    #print('PASS!  matches ' + validated_image_filename)
-                else:
-                    matching = False
-                    match_text = "NOT A MATCH"
-                    text_color = (0, 0, 255)
-                    #print('FAIL!  does not match ' + validated_image_filename)
-
-                overlay_on_image(infer_image, "SunplusIT", matching)
-
-                cv2.putText(infer_image, match_text, (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
-
-                cv2.imshow("TEST", infer_image)
-
-                cv2.waitKey(1)
-
-     
+                    test_output = run_inference(infer_image, graph)
+                    matching = compare_img(test_output, valid_output0, infer_image, cameraID)
