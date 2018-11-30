@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from mvnc import mvncapi as mvnc
-import numpy
+import numpy as np
 import cv2
 import sys
 import os, time
@@ -27,6 +27,8 @@ cascade_scale = 1.1
 cascade_neighbors = 8
 minFaceSize = (90,100)
 
+cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
+cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 #---------------------------------------------------------
 def createEnv():
     if not os.path.exists(validPicPath):
@@ -84,7 +86,7 @@ def run_inference(image_to_classify, facenet_graph):
     # ***************************************************************
     # Send the image to the NCS
     # ***************************************************************
-    facenet_graph.LoadTensor(resized_image.astype(numpy.float16), None)
+    facenet_graph.LoadTensor(resized_image.astype(np.float16), None)
 
     # ***************************************************************
     # Get the result from the NCS
@@ -113,10 +115,10 @@ def overlay_on_image(display_image, image_info, matching):
                       (0, 0, 255), 10)
 
 def whiten_image(source_image):
-    source_mean = numpy.mean(source_image)
-    source_standard_deviation = numpy.std(source_image)
-    std_adjusted = numpy.maximum(source_standard_deviation, 1.0 / numpy.sqrt(source_image.size))
-    whitened_image = numpy.multiply(numpy.subtract(source_image, source_mean), 1 / std_adjusted)
+    source_mean = np.mean(source_image)
+    source_standard_deviation = np.std(source_image)
+    std_adjusted = np.maximum(source_standard_deviation, 1.0 / np.sqrt(source_image.size))
+    whitened_image = np.multiply(np.subtract(source_image, source_mean), 1 / std_adjusted)
     return whitened_image
 
 def preprocess_image(src):
@@ -140,7 +142,7 @@ def face_match(face1_output, face2_output):
         return False
     total_diff = 0
     for output_index in range(0, len(face1_output)):
-        this_diff = numpy.square(face1_output[output_index] - face2_output[output_index])
+        this_diff = np.square(face1_output[output_index] - face2_output[output_index])
         total_diff += this_diff
     #print('difference is: ' + str(total_diff))
 
@@ -182,11 +184,11 @@ def compare_img(nowImg, orgImg, objImg, camID):
 
     print(match_text)
     cv2.putText(objImg, match_text, (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-    cv2.imshow("Camera-" + str(camID), objImg)
+    #cv2.imshow("Camera-" + str(camID), objImg)
     #key = cv2.waitKey(1)
     #print("key:", key)
 
-    return matching
+    return matching, objImg
 
 def createID(id):
     validated_image_filename0 = validPicPath+str(id)+"/cam0/valid.jpg"
@@ -207,8 +209,9 @@ def createID(id):
     takingPic = True
     pic_cam0 = False   #has cam0 taken the pic?
     pic_cam1 = False   #has cam1 taken the pic?
-
+    imgDisplay = [[],[]]
     while takingPic:
+
         for cameraID in [0,1]:
             hasFrame, infer_image = get_cameraimage(cameraID)
             #print("#"+str(cameraID), hasFrame)
@@ -243,11 +246,13 @@ def createID(id):
                             takingPic = False
                             break
 
-            cv2.imshow("Camera-"+str(cameraID), displayIMG)
+            imgDisplay[cameraID] = displayIMG
 
-            if(cameraID==1):
-                key = cv2.waitKey(1)
-                print("key:", key)
+        cv2.imshow("SunplusIT", np.hstack((imgDisplay[0], imgDisplay[1])))
+
+        #if(cameraID==1):
+        key = cv2.waitKey(1)
+        print("key:", key)
 
 
 
@@ -321,6 +326,7 @@ while True:
                 #----------------------------------------------------------
 
                 key = 0
+                imgCompared = [[],[]]
                 while True:
                     if(inputType == "webcam"):
 
@@ -342,13 +348,16 @@ while True:
                                 else:
                                     valid_pic = valid_output1
 
-                                matching = compare_img(test_output, valid_pic, infer_image, cameraID)
+                                matching, img_compared = compare_img(test_output, valid_pic, infer_image, cameraID)
+                                imgCompared[cameraID] = img_compared
                                 if(key==99):
                                     picFile = validPicPath+str(peopleID)+"/cam"+str(cameraID)+"/"+str(time.time())+".jpg"
                                     print("write:", picFile)
                                     cv2.imwrite(picFile, infer_image) 
 
                             if(cameraID==1):
+
+                                cv2.imshow("SunplusIT", np.hstack((imgCompared[0], imgCompared[1])) )
                                 key = cv2.waitKey(1)
                                 print("key:", key)
 
