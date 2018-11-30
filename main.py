@@ -1,13 +1,13 @@
 #! /usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 from mvnc import mvncapi as mvnc
 import numpy
 import cv2
 import sys
 import os, time
+import easygui
 
-validated_image_filename0 = "validated_images/ch.tseng0.jpg"
-validated_image_filename1 = "validated_images/ch.tseng1.jpg"
 
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 inputType = "webcam"  # webcam, image, video
@@ -15,13 +15,44 @@ media = ""
 #video_out = "/media/pi/SSD1T/recording/road.avi"
 video_out = "record/"
 
-FACE_MATCH_THRESHOLD = 1.2
+FACE_MATCH_THRESHOLD = 0.75
 
 video_length = 600
 framerate = 5.0
-webcam_size = (640,480)
+webcam_size = (320,240)
+
+validPicPath = "valid/"
+#peopleID = 334
 
 #---------------------------------------------------------
+def createEnv():
+    if not os.path.exists(validPicPath):
+        os.makedirs(validPicPath)
+        print("Pics for valid path created:", validPicPath)
+
+    #if not os.path.exists(validPicPath + str(peopleID)):
+    #    os.makedirs(validPicPath+str(peopleID))
+    #    print("Pics for valid user path created:", validPicPath+str(peopleID))
+
+    #if not os.path.exists(validPicPath + str(peopleID) + "/cam0"):
+    #    os.makedirs(validPicPath+str(peopleID) + "/cam0")
+    #    print("Pics for valid user path created:", validPicPath+str(peopleID)+"/cam0")
+
+    #if not os.path.exists(validPicPath + str(peopleID) + "/cam1"):
+    #    os.makedirs(validPicPath+str(peopleID) + "/cam1")
+    #    print("Pics for valid user path created:", validPicPath+str(peopleID)+"/cam1")
+
+def chkID(id):
+    if not os.path.exists(validPicPath + str(id)):
+        easygui.msgbox('您的ID{}還沒有申請刷臉打卡哦！'.format(id))
+        return False
+    else:
+        if(os.path.exists(validPicPath + str(id) + '/cam0/valid.jpg') and \
+                (os.path.exists(validPicPath + str(id) + '/cam1/valid.jpg'))):
+            return True
+        else:
+            return False
+
 def run_inference(image_to_classify, facenet_graph):
 
     # get a resized version of the image that is the dimensions
@@ -97,12 +128,12 @@ def face_match(face1_output, face2_output):
         # the total difference between the two is under the threshold so
         # the faces match.
         print('Pass! difference is: ' + str(total_diff))
-        return True
+        return True, total_diff
 
     # differences between faces was over the threshold above so
     # they didn't match.
     print('No pass! difference is: ' + str(total_diff))
-    return False
+    return False, total_diff
 
 def handle_keys(raw_key):
     ascii_code = raw_key & 0xFF
@@ -120,107 +151,114 @@ def get_cameraimage(id):
     return hasFrame, infer_image
 
 def compare_img(nowImg, orgImg, objImg, camID):
-    matching = False
-    if (face_match(orgImg, test_output)):
-        matching = True
-    else:
-        matching = False
+    matching, faceScore = face_match(orgImg, nowImg)
 
     if(matching==True):
-        match_text = "#"+str(camID)+" Matched"
+        color = (0,255,0)
+        match_text = "#"+str(camID)+" Matched: "+str(round(faceScore,2)) 
     else:
-        match_text = "#"+str(camID)+" Not matched"
+        color = (0,0,255)
+        match_text = "#"+str(camID)+" Not matched: "+str(round(faceScore,2))
 
-    cv2.putText(objImg, match_text, (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
+    print(match_text)
+    cv2.putText(objImg, match_text, (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
     cv2.imshow("Camera-" + str(camID), objImg)
-    cv2.waitKey(1)
+    #key = cv2.waitKey(1)
+    #print("key:", key)
 
     return matching
 
 start_time = time.time()
 
-if __name__ == "__main__":
+while True:
 
-    if(inputType == "webcam"):
-        INPUT0 = cv2.VideoCapture(0)
-        INPUT0.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
-        INPUT0.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
+    faceDetectNow = easygui.ynbox('您想要使用臉孔識別打卡嗎？', '凌陽創新', ('是', '否'))
 
-        INPUT1 = cv2.VideoCapture(1)
-        INPUT1.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
-        INPUT1.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
+    if(faceDetectNow):
+        peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=201000)
 
-        width = webcam_size[0]
-        height = webcam_size[1]
+        if(peopleID>200000 and peopleID<201000):
 
-    elif(inputType == "image"):
-        INPUT = cv2.imread(media)
+            if(chkID(peopleID)==True):
 
-    elif(inputType == "video"):
-        INPUT = cv2.VideoCapture(media)
-        width = cv2.CAP_PROP_FRAME_WIDTH
+                #chkEnv()
+                validated_image_filename0 = validPicPath+str(peopleID)+"/cam0/valid.jpg"
+                validated_image_filename1 = validPicPath+str(peopleID)+"/cam1/valid.jpg"
 
-    if(inputType == "image"):
-        cv2.imshow("Frame", imutils.resize(INPUT, width=850))
+                INPUT0 = cv2.VideoCapture(0)
+                INPUT0.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
+                INPUT0.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
 
-        k = cv2.waitKey(0)
-        if k == 0xFF & ord("q"):
-            out.release()
+                INPUT1 = cv2.VideoCapture(1)
+                INPUT1.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
+                INPUT1.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
 
-    else:
-        #if(video_out!=""):
-            #width = int(INPUT.get(cv2.CAP_PROP_FRAME_WIDTH))   # float
-            #height = int(INPUT.get(cv2.CAP_PROP_FRAME_HEIGHT)) # float
+                width = webcam_size[0]
+                height = webcam_size[1]
 
-            #fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-            #out = cv2.VideoWriter(video_out + str(time.time()) + ".avi",fourcc, framerate, (int(width),int(height)))
+                frameID = 0
+                record_time = time.time()
 
-        frameID = 0
-        record_time = time.time()
+                #------------------------------------------------------
+                devices = mvnc.EnumerateDevices()
+                if len(devices) == 0:
+                    print('No NCS devices found')
+                    quit()
 
-        #------------------------------------------------------
-        devices = mvnc.EnumerateDevices()
-        if len(devices) == 0:
-            print('No NCS devices found')
-            quit()
+                # Pick the first stick to run the network
+                device = mvnc.Device(devices[0])
 
-        # Pick the first stick to run the network
-        device = mvnc.Device(devices[0])
+                # Open the NCS
+                device.OpenDevice()
 
-        # Open the NCS
-        device.OpenDevice()
+                # The graph file that was created with the ncsdk compiler
+                graph_file_name = GRAPH_FILENAME
 
-        # The graph file that was created with the ncsdk compiler
-        graph_file_name = GRAPH_FILENAME
+                # read in the graph file to memory buffer
+                with open(graph_file_name, mode='rb') as f:
+                    graph_in_memory = f.read()
 
-        # read in the graph file to memory buffer
-        with open(graph_file_name, mode='rb') as f:
-            graph_in_memory = f.read()
+                # create the NCAPI graph instance from the memory buffer containing the graph file.
+                graph = device.AllocateGraph(graph_in_memory)
 
-        # create the NCAPI graph instance from the memory buffer containing the graph file.
-        graph = device.AllocateGraph(graph_in_memory)
+                #--Read the validate image -----------------------------------------------------------
 
-        #--Read the validate image -----------------------------------------------------------
+                validated_image0 = cv2.imread(validated_image_filename0)
+                validated_image1 = cv2.imread(validated_image_filename1)
+                valid_output0 = run_inference(validated_image0, graph)
+                valid_output1 = run_inference(validated_image1, graph)
+                #----------------------------------------------------------
 
-        validated_image0 = cv2.imread(validated_image_filename0)
-        validated_image1 = cv2.imread(validated_image_filename1)
-        valid_output0 = run_inference(validated_image0, graph)
-        valid_output1 = run_inference(validated_image1, graph)
-        #----------------------------------------------------------
+                key = 0
+                while True:
+                    if(inputType == "webcam"):
 
-        while True:
-            if(inputType == "webcam"):
-                for cameraID in [0,1]:
-                    hasFrame, infer_image = get_cameraimage(cameraID)
+                        for cameraID in [0,1]:
+                            hasFrame, infer_image = get_cameraimage(cameraID)
 
-                    print("#"+str(cameraID), hasFrame)
-                    if (not hasFrame):
-                        print("#"+str(cameraID)+" Done processing !!!")
-                        print("--- %s seconds ---" % (time.time() - start_time))
-                        #if(video_out!=""):
-                        #    out.release()
+                            #print("#"+str(cameraID), hasFrame)
+                            if (not hasFrame):
+                                print("#"+str(cameraID)+" Done processing !!!")
+                                print("--- %s seconds ---" % (time.time() - start_time))
+                                #if(video_out!=""):
+                                #    out.release()
 
-                        break
+                                pass
+                            else:
+                                test_output = run_inference(infer_image, graph)
+                                if(cameraID==0):
+                                    valid_pic = valid_output0
+                                else:
+                                    valid_pic = valid_output1
 
-                    test_output = run_inference(infer_image, graph)
-                    matching = compare_img(test_output, valid_output0, infer_image, cameraID)
+                                matching = compare_img(test_output, valid_pic, infer_image, cameraID)
+                                if(key==99):
+                                    picFile = validPicPath+str(peopleID)+"/cam"+str(cameraID)+"/"+str(time.time())+".jpg"
+                                    print("write:", picFile)
+                                    cv2.imwrite(picFile, infer_image) 
+
+                            if(cameraID==1):
+                                key = cv2.waitKey(1)
+                                print("key:", key)
+
+
