@@ -168,35 +168,91 @@ def compare_img(nowImg, orgImg, objImg, camID):
 
     return matching
 
+def createID(id):
+    validated_image_filename0 = validPicPath+str(id)+"/cam0/valid.jpg"
+    validated_image_filename1 = validPicPath+str(id)+"/cam1/valid.jpg"
+    if not os.path.exists(validPicPath + str(id)):
+        os.makedirs(validPicPath+str(id))
+        print("Pics for valid user path created:", validPicPath+str(id))
+
+    if not os.path.exists(validPicPath + str(id) + "/cam0"):
+        os.makedirs(validPicPath+str(id) + "/cam0")
+        print("Pics for valid user path created:", validPicPath+str(id)+"/cam0")
+
+    if not os.path.exists(validPicPath + str(id) + "/cam1"):
+        os.makedirs(validPicPath+str(id) + "/cam1")
+        print("Pics for valid user path created:", validPicPath+str(peopleID)+"/cam1")
+
+    key = 0
+    takingPic = True
+    while takingPic:
+        for cameraID in [0,1]:
+            hasFrame, infer_image = get_cameraimage(cameraID)
+            #print("#"+str(cameraID), hasFrame)
+            if (not hasFrame):
+                easygui.msgbox('相機#'+str(cameraID)+'有問題無法拍照，請洽MIS。')
+                takingPic = False
+                break
+
+            else:
+                if(cameraID==0):
+                    valid_pic = validated_image_filename0
+                else:
+                    valid_pic = validated_image_filename1
+
+                if(key==99):
+                    print("write:", valid_pic)
+                    cv2.imwrite(valid_pic, infer_image) 
+                    if(cameraID==1):
+                        easygui.msgbox('相片拍攝完畢！')
+                        takingPic = False
+                        break
+
+            cv2.imshow("Camera #"+str(cameraID), infer_image)
+
+            if(cameraID==1):
+                key = cv2.waitKey(1)
+                print("key:", key)
+
+
+
 start_time = time.time()
+
+INPUT0 = cv2.VideoCapture(0)
+INPUT0.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
+INPUT0.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
+
+INPUT1 = cv2.VideoCapture(1)
+INPUT1.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
+INPUT1.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
 
 while True:
 
-    faceDetectNow = easygui.ynbox('您想要使用臉孔識別打卡嗎？', '凌陽創新', ('是', '否'))
+    ynBox = easygui.ynbox('您想要使用臉孔識別打卡嗎？', '凌陽創新', ('是', '否'))
 
-    if(faceDetectNow):
-        peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=201000)
+    if(ynBox):
+        peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
 
-        if(peopleID>200000 and peopleID<201000):
+        if(peopleID==211111):
+            ynBox = easygui.ynbox('您確定要建立臉孔識別打卡的新使用者嗎？', '建立使用者', ('是', '否'))
 
+            if(ynBox):
+                peopleID = easygui.integerbox('請輸入新使用者的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
+                if(chkID(peopleID) is True):
+                    easygui.msgbox('已經有此使用者的臉孔資料了！')
+
+                else:
+                    ynBox = easygui.ynbox('按下「拍照鍵」五秒後即開始拍照', '凌陽創新', ('拍照', '取消'))
+                    if(ynBox):
+                        createID(peopleID)
+
+        else:
             if(chkID(peopleID)==True):
 
                 #chkEnv()
                 validated_image_filename0 = validPicPath+str(peopleID)+"/cam0/valid.jpg"
                 validated_image_filename1 = validPicPath+str(peopleID)+"/cam1/valid.jpg"
 
-                INPUT0 = cv2.VideoCapture(0)
-                INPUT0.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
-                INPUT0.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
-
-                INPUT1 = cv2.VideoCapture(1)
-                INPUT1.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_size[0])
-                INPUT1.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_size[1])
-
-                width = webcam_size[0]
-                height = webcam_size[1]
-
-                frameID = 0
                 record_time = time.time()
 
                 #------------------------------------------------------
