@@ -63,6 +63,58 @@ def chkID(id):
         else:
             return False
 
+def matchFace(employeeID=200334, totalCount=5):
+    totalCount1 = 0
+    totalCount2 = 0
+    passCount1 = 0
+    passCount2 = 0
+
+    while totalCount1<totalCount or totalCount2<totalCount:
+        okPic1 = True
+        okPic2 = True
+        picSavePath1 = validPicPath + str(employeeID) + "/cam0/"
+        picSavePath2 = validPicPath + str(employeeID) + "/cam1/"
+
+        okPic1, pic1 = cam1.takepic(rotate=0, resize=None, savePath=None)
+        if(okPic1 is not True):
+            print("Taking a picture by cam1 is failed!")
+
+        okPic2, pic2 = cam2.takepic(rotate=0, resize=None, savePath=None)
+        if(okPic2 is not True):
+            print("Taking a picture by cam2 is failed!")
+
+        if(okPic1 is True and totalCount1<totalCount):
+            bbox = getFaces_cascade(pic1)
+            if(len(bbox)>0):
+                tmpPic1 = pic1.copy()
+                for (x,y,w,h) in bbox:
+                    cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
+
+                valid = cv2.imread(validPicPath + str(employeeID) + "/cam0/valid.jpg")
+                passYN1, score1 = faceCheck.face_match(face1=pic1, face2=valid, threshold=0.75)
+                totalCount1 += 1
+                if(passYN1 is True):
+                    passCount1 += 1
+
+        if(okPic2 is True and totalCount2<totalCount):
+            bbox = getFaces_cascade(pic2)
+            if(len(bbox)>0):
+                tmpPic2 = pic2.copy()
+                for (x,y,w,h) in bbox:
+                    cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),2)
+
+                valid = cv2.imread(validPicPath + str(employeeID) + "/cam1/valid.jpg")
+                passYN2, score2 = faceCheck.face_match(face1=pic2, face2=valid, threshold=0.75)
+                totalCount2 += 1
+                if(passYN2 is True):
+                    passCount2 += 1
+
+        if(totalCount1>0 and totalCount2>0):
+            cv2.imshow("SunplusIT", np.hstack((tmpPic1, tmpPic2)) )
+            cv2.waitKey(1)
+
+    return passCount1, passCount2
+
 #------------------------------------------------------------------------
 
 camOK = True
@@ -81,26 +133,8 @@ faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
 
 while camOK:
 
-    okPic1 = True
-    okPic2 = True
 
-    okPic1, pic1 = cam1.takepic(rotate=0, resize=None, savePath=None)
-    if(okPic1 is not True):
-        print("Taking a picture by cam1 is failed!")
+    passCount1, passCount2 = matchFace(employeeID=200334, totalCount=5)
+    print(passCount1, passCount2)
 
-    okPic2, pic2 = cam2.takepic(rotate=0, resize=None, savePath=None)
-    if(okPic2 is not True):
-        print("Taking a picture by cam2 is failed!")
-
-    if(okPic1 is True):
-        valid = cv2.imread(validPicPath + "200334/cam0/valid.jpg")
-        faceCheck.face_match(face1=pic1, face2=valid, threshold=0.75)
-
-    if(okPic2 is True):
-        valid = cv2.imread(validPicPath + "200334/cam0/valid.jpg")
-        faceCheck.face_match(face1=pic2, face2=valid, threshold=0.75)
-
-    cv2.imshow("cam1", pic1)
-    cv2.imshow("cam2", pic2)
-
-    cv2.waitKey(1)
+    time.sleep(6)

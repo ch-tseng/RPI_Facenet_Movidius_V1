@@ -1,3 +1,4 @@
+import time
 import imutils
 import cv2
 import numpy as np
@@ -24,7 +25,7 @@ class webCam:
         if(resize is not None):
             frame = imutils.resize(frame, size=resize)
         if((hasFrame is True) and (savePath is not None)):
-            cv2.imwrite(savePath, frame)
+            cv2.imwrite(savePath+str(time.time())+".jpg", frame)
 
         return hasFrame, frame
 
@@ -110,15 +111,15 @@ class facenetVerify:
         for output_index in range(0, len(face1_output)):
             this_diff = np.square(face1_output[output_index] - face2_output[output_index])
             total_diff += this_diff
-        print('difference is: {}'.format(total_diff))
+        #print('difference is: {}'.format(total_diff))
 
         if (total_diff < threshold):
             # the total difference between the two is under the threshold so
             # the faces match.
-            print('Pass! difference is: ' + str(total_diff))
+            #print('Pass! difference is: ' + str(total_diff))
             return True, total_diff
         else:
             # differences between faces was over the threshold above so
             # they didn't match.
-            print('No pass! difference is: ' + str(total_diff))
+            #print('No pass! difference is: ' + str(total_diff))
             return False, total_diff
