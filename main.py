@@ -14,12 +14,15 @@ GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 FACE_MATCH_THRESHOLD = 0.75
 webcam_size = (320,240)
 
-previewPicPath = "preview/"
+previewPicPath = "preview/"  #all pics face size is not pass the required size
+historyPicPath = "history/"   #for those face is pass the required size and will be check
 validPicPath = "valid/"
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 cascade_scale = 1.1
 cascade_neighbors = 8
-minFaceSize = (90,100)
+minFaceSize = (90,90)  #for cascade
+minFaceSize1 = (150,150)  #for send to facenet  webcam1
+minFaceSize2 = (120, 120)  #for send to facenet webcam2
 
 #cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
 #cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
@@ -35,6 +38,11 @@ def createEnv():
     if not os.path.exists(previewPicPath):
         os.makedirs(previewPicPath)
         print("Pics for preview path created:", previewPicPath)
+
+    if not os.path.exists(historyPicPath):
+        os.makedirs(historyPicPath)
+        print("Pics for history path created:", historyPicPath)
+
 
 def getFaces_cascade(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -97,29 +105,17 @@ def matchFace():
     idYN = []
     idScore = []
 
-    '''
-    okPic1, pic1 = cam1.takepic(rotate=0, resize=None, savePath=None)
-    if(okPic1 is not True):
-        print("Taking a picture by cam1 is failed!")
-    else:
-        tmpPic1 = pic1.copy()
-
-    okPic2, pic2 = cam2.takepic(rotate=0, resize=None, savePath=None)
-    if(okPic2 is not True):
-        print("Taking a picture by cam2 is failed!")
-    else:
-        tmpPic2 = pic2.copy()
-    '''
     #----------------------
     bbox1 = []
     bbox2 = []
+    #Are we get the usable face ?
+    faceCam1 = False
+    faceCam2 = False
 
-    while (len(bbox1)<1) or (len(bbox2)<1):
-        #print(len(bbox1), len(bbox2))
-        #bbox1 = []
-        #bbox2 = []
+    while (faceCam1 is False) or (faceCam2 is False):
 
-        #if(len(bbox1)<1):
+        faceCam1 = False
+        faceCam2 = False
         okPic1, pic1 = cam1.takepic(rotate=0, resize=None, savePath=None)
         if(okPic1 is not True):
             print("Taking a picture by cam1 is failed!")
@@ -127,10 +123,13 @@ def matchFace():
             tmpPic1 = pic1.copy()
             bbox1 = getFaces_cascade(pic1)
             if(len(bbox1)>0):
-                for (x,y,w,h) in bbox1:
-                    cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
+                print(bbox1[0][2], bbox1[0][3])
+                if( bbox1[0][2]>minFaceSize1[0] and bbox1[0][3]>minFaceSize1[1]):
+                    faceCam1 = True
+                    cv2.imwrite(historyPicPath + "/cam0/" + str(time.time()) + ".jpg", )
+                    for (x,y,w,h) in bbox1:
+                        cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
 
-        #if(len(bbox2)<1):
         okPic2, pic2 = cam2.takepic(rotate=0, resize=None, savePath=None)
         if(okPic2 is not True):
             print("Taking a picture by cam2 is failed!")
@@ -138,9 +137,12 @@ def matchFace():
             tmpPic2 = pic2.copy()
             bbox2 = getFaces_cascade(pic2)
             if(len(bbox2)>0):
-                for (x,y,w,h) in bbox2:
-                    cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),2)
-
+                print(bbox2[0][2], bbox2[0][3])
+                if(bbox2[0][2]>minFaceSize2[0] and bbox2[0][3]>minFaceSize2[1]):
+                    faceCam2 = True
+                    cv2.imwrite(historyPicPath + "/cam1/" + str(time.time()) + ".jpg", )
+                    for (x,y,w,h) in bbox2:
+                        cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),2)
 
         cv2.imshow("SunplusIT", np.hstack((tmpPic1, seperateBLock, tmpPic2)) )
         cv2.waitKey(1)
@@ -162,7 +164,7 @@ def matchFace():
             idYN.append((passYN1, passYN2))
             idScore.append((score1, score2))
 
-    return idList, idYN, idScore
+    return pic1, pic2, idList, idYN, idScore
 
 
 def matchFace2(employeeID=200334, totalCount=5):
@@ -239,7 +241,7 @@ faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
 
 while True:
 
-    idList, idYN, idScore = matchFace()
+    camFace1, camFace2, idList, idYN, idScore = matchFace()
     if(idList is not None):
         i = 0
         for id in idList:
