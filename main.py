@@ -4,6 +4,7 @@
 from mvnc import mvncapi as mvnc
 import numpy as np
 import cv2
+import imutils
 import sys
 import os, time
 import easygui
@@ -83,6 +84,21 @@ def chkID(id):
         else:
             return False
 
+def displayScreen(img=None, overlay=None):
+    board = cv2.imread("board.png")
+    if(img is not None and overlay is not None):
+        y_offset = overlay[1]
+        x_offset = overlay[0]
+        board[y_offset:y_offset+img.shape[0], x_offset:x_offset+img.shape[1]] = img
+
+    return board
+    #cv2.imshow("SunplusIT", board )
+    #cv2.waitKey(1)
+
+#def printText(text=None, color=(0,0,0)):
+#    if(text is not None):
+#        board = cv2.imread("board.png")
+
 def matchFace():
     tmpPic1 = blankScreen.copy()
     tmpPic2 = blankScreen.copy()
@@ -129,9 +145,9 @@ def matchFace():
         print(time.time() - captureStart)
         if(time.time() - captureStart > captureTime):
             print("Time limit")
-            cv2.imshow("SunplusIT", np.hstack((blankScreen, seperateBLock, blankScreen)) )
-            cv2.waitKey(1)
-            return None, None, None, None, None
+            screen = displayScreen(None, None)
+            
+            return None, None, None, None, None, None
             break
 
         faceCam1 = False
@@ -166,10 +182,12 @@ def matchFace():
                     for (x,y,w,h) in bbox2:
                         cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),2)
 
-        print(tmpPic1.shape, seperateBLock.shape, tmpPic2.shape)
-        cv2.imshow("SunplusIT", np.hstack((tmpPic1, seperateBLock, tmpPic2)) )
-        cv2.waitKey(1)
+        #print(tmpPic1.shape, seperateBLock.shape, tmpPic2.shape)
+        cameraArea = imutils.resize(np.hstack((tmpPic1, seperateBLock, tmpPic2)), width=800)
+        screen = displayScreen(cameraArea, (0,130))
 
+        cv2.imshow("SunplusIT", screen)
+        cv2.waitKey(1)
     #----------------------
 
     for folderID in os.listdir(validPicPath):
@@ -187,77 +205,9 @@ def matchFace():
             idYN.append((passYN1, passYN2))
             idScore.append((score1, score2))
 
-    return pic1, pic2, idList, idYN, idScore
+    return pic1, pic2, idList, idYN, idScore, screen
 
 
-def matchFace2(employeeID=200334, totalCount=5):
-    totalCount1 = 0
-    totalCount2 = 0
-    passCount1 = 0
-    passCount2 = 0
-
-    okPic1 = True
-    okPic2 = True
-    picSavePath1 = validPicPath + str(employeeID) + "/cam0/"
-    picSavePath2 = validPicPath + str(employeeID) + "/cam1/"
-    tmpPic1 = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
-    tmpPic2 = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
-    seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
-
-    while totalCount1<totalCount or totalCount2<totalCount:
-
-        okPic1, pic1 = cam1.takepic(rotate=0, resize=None, savePath=None)
-        if(okPic1 is not True):
-            print("Taking a picture by cam1 is failed!")
-
-        okPic2, pic2 = cam2.takepic(rotate=0, resize=None, savePath=None)
-        if(okPic2 is not True):
-            print("Taking a picture by cam2 is failed!")
-
-        if(okPic1 is True and totalCount1<totalCount):
-            bbox = getFaces_cascade(pic1)
-            if(len(bbox)>0):
-                tmpPic1 = pic1.copy()
-                for (x,y,w,h) in bbox:
-                    cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
-
-                valid = cv2.imread(validPicPath + str(employeeID) + "/cam0/valid.jpg")
-                passYN1, score1 = faceCheck.face_match(face1=pic1, face2=valid, threshold=0.75)
-                totalCount1 += 1
-                if(passYN1 is True):
-                    passCount1 += 1
-
-        if(okPic2 is True and totalCount2<totalCount):
-            bbox = getFaces_cascade(pic2)
-            if(len(bbox)>0):
-                tmpPic2 = pic2.copy()
-                for (x,y,w,h) in bbox:
-                    cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),2)
-
-                valid = cv2.imread(validPicPath + str(employeeID) + "/cam1/valid.jpg")
-                passYN2, score2 = faceCheck.face_match(face1=pic2, face2=valid, threshold=0.75)
-                totalCount2 += 1
-                if(passYN2 is True):
-                    passCount2 += 1
-
-        cv2.imshow("SunplusIT", np.hstack((tmpPic1, seperateBLock, tmpPic2)) )
-        cv2.waitKey(1)
-
-    return passCount1, passCount2
-
-#------------------------------------------------------------------------
-'''
-camOK = True
-cam1 = webCam(id=0, size=(320,240))
-if(cam1.working() is False):
-    camOK = False
-    print("Web camera #1 is not working!")
-
-cam2 = webCam(id=1, size=(320,240))
-if(cam2.working() is False):
-    camOK = False
-    print("Web camera #2 is not working!")
-'''
 
 faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
 #------------------------------------------------------------------------
@@ -266,7 +216,7 @@ createEnv()
 
 while True:
 
-    camFace1, camFace2, idList, idYN, idScore = matchFace()
+    camFace1, camFace2, idList, idYN, idScore, screen = matchFace()
     if(idList is not None):
         chkList = []
         i = 0
@@ -280,6 +230,29 @@ while True:
 
         print("Final:")
         print(chkList)
+
+        openDoor = False
+        if(len(chkList)>0):
+            peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
+            print("Input:", peopleID)
+
+            if(chkID(peopleID) is True):
+                for id, score in chkList:
+                    print("Check:", id)
+                    if(int(id) == peopleID):
+                        openDoor = True
+                        print("Pass, score is:", score)
+
+        if(openDoor is True):
+            cv2.putText(screen, "Pass, door opened!", (160, 420), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2) 
+        else:
+            cv2.putText(screen, "Sorry, you are not verified!", (130, 420), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2) 
+
+        #time.sleep(10)
+
+    if(screen is not None):
+        cv2.imshow("SunplusIT", screen )
+        cv2.waitKey(1)
 
     print("Wait 10 seconds")
     time.sleep(10)
