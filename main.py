@@ -69,11 +69,15 @@ def matchFace(employeeID=200334, totalCount=5):
     passCount1 = 0
     passCount2 = 0
 
+    okPic1 = True
+    okPic2 = True
+    picSavePath1 = validPicPath + str(employeeID) + "/cam0/"
+    picSavePath2 = validPicPath + str(employeeID) + "/cam1/"
+    tmpPic1 = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
+    tmpPic2 = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
+    seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
+
     while totalCount1<totalCount or totalCount2<totalCount:
-        okPic1 = True
-        okPic2 = True
-        picSavePath1 = validPicPath + str(employeeID) + "/cam0/"
-        picSavePath2 = validPicPath + str(employeeID) + "/cam1/"
 
         okPic1, pic1 = cam1.takepic(rotate=0, resize=None, savePath=None)
         if(okPic1 is not True):
@@ -109,9 +113,8 @@ def matchFace(employeeID=200334, totalCount=5):
                 if(passYN2 is True):
                     passCount2 += 1
 
-        if(totalCount1>0 and totalCount2>0):
-            cv2.imshow("SunplusIT", np.hstack((tmpPic1, tmpPic2)) )
-            cv2.waitKey(1)
+        cv2.imshow("SunplusIT", np.hstack((tmpPic1, seperateBLock, tmpPic2)) )
+        cv2.waitKey(1)
 
     return passCount1, passCount2
 
