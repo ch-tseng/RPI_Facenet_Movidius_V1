@@ -26,8 +26,9 @@ minFaceSize = (90,90)  #for cascade
 minFaceSize1 = (160,160)  #for send to facenet  webcam1
 minFaceSize2 = (160, 160)  #for send to facenet webcam2
 
-#cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
-#cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
+cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+
 blankScreen = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
 #-----------------------------------------------------------------------
 
@@ -162,7 +163,7 @@ def matchFace():
                 print(bbox1[0][2], bbox1[0][3])
                 if( bbox1[0][2]>minFaceSize1[0] and bbox1[0][3]>minFaceSize1[1]):
                     faceCam1 = True
-                    #cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
+                    cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
                     print("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
                     for (x,y,w,h) in bbox1:
                         cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
@@ -177,7 +178,7 @@ def matchFace():
                 print(bbox2[0][2], bbox2[0][3])
                 if(bbox2[0][2]>minFaceSize2[0] and bbox2[0][3]>minFaceSize2[1]):
                     faceCam2 = True
-                    #cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + ".jpg", pic2 )
+                    cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + ".jpg", pic2 )
                     print("write to:", historyPicPath + "cam1/" + str(time.time()) + ".jpg")
                     for (x,y,w,h) in bbox2:
                         cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),2)
@@ -255,4 +256,4 @@ while True:
         cv2.waitKey(1)
 
     print("Wait 10 seconds")
-    time.sleep(10)
+    time.sleep(2)
