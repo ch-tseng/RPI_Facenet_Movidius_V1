@@ -12,8 +12,9 @@ from libFacialDoor import facenetVerify
 
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 FACE_MATCH_THRESHOLD = 0.75
-webcam_size = (320,240)
+webcam_size = ( 544,288)
 
+captureTime = 30  #how long will camera try to capture the face for verify a face
 previewPicPath = "preview/"  #all pics face size is not pass the required size
 historyPicPath = "history/"   #for those face is pass the required size and will be check
 validPicPath = "valid/"
@@ -21,13 +22,12 @@ face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 cascade_scale = 1.1
 cascade_neighbors = 8
 minFaceSize = (90,90)  #for cascade
-minFaceSize1 = (150,150)  #for send to facenet  webcam1
-minFaceSize2 = (120, 120)  #for send to facenet webcam2
+minFaceSize1 = (160,160)  #for send to facenet  webcam1
+minFaceSize2 = (160, 160)  #for send to facenet webcam2
 
 #cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
 #cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
-tmpPic1 = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
-tmpPic2 = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
+blankScreen = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
 #-----------------------------------------------------------------------
 
 def createEnv():
@@ -38,11 +38,22 @@ def createEnv():
     if not os.path.exists(previewPicPath):
         os.makedirs(previewPicPath)
         print("Pics for preview path created:", previewPicPath)
+    if not os.path.exists(previewPicPath+"/cam0"):
+        os.makedirs(previewPicPath+"/cam0")
+        print("Pics for preview path created:", previewPicPath+"/cam0")
+    if not os.path.exists(previewPicPath+"/cam1"):
+        os.makedirs(previewPicPath+"/cam1")
+        print("Pics for preview path created:", previewPicPath+"/cam1")
 
     if not os.path.exists(historyPicPath):
         os.makedirs(historyPicPath)
         print("Pics for history path created:", historyPicPath)
-
+    if not os.path.exists(historyPicPath+"/cam0"):
+        os.makedirs(historyPicPath+"/cam0")
+        print("Pics for history path created:", historyPicPath+"/cam0")
+    if not os.path.exists(historyPicPath+"/cam1"):
+        os.makedirs(historyPicPath+"/cam1")
+        print("Pics for history path created:", historyPicPath+"/cam1")
 
 def getFaces_cascade(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -73,15 +84,16 @@ def chkID(id):
             return False
 
 def matchFace():
-    global tmpPic1, tmpPic2
+    tmpPic1 = blankScreen.copy()
+    tmpPic2 = blankScreen.copy()
 
     camOK = True
-    cam1 = webCam(id=0, size=(320,240))
+    cam1 = webCam(id=0, size=webcam_size)
     if(cam1.working() is False):
         camOK = False
         print("Web camera #1 is not working!")
 
-    cam2 = webCam(id=1, size=(320,240))
+    cam2 = webCam(id=1, size=webcam_size)
     if(cam2.working() is False):
         camOK = False
         print("Web camera #2 is not working!")
@@ -112,7 +124,15 @@ def matchFace():
     faceCam1 = False
     faceCam2 = False
 
+    captureStart = time.time()
     while (faceCam1 is False) or (faceCam2 is False):
+        print(time.time() - captureStart)
+        if(time.time() - captureStart > captureTime):
+            print("Time limit")
+            cv2.imshow("SunplusIT", np.hstack((blankScreen, seperateBLock, blankScreen)) )
+            cv2.waitKey(1)
+            return None, None, None, None, None
+            break
 
         faceCam1 = False
         faceCam2 = False
@@ -126,7 +146,8 @@ def matchFace():
                 print(bbox1[0][2], bbox1[0][3])
                 if( bbox1[0][2]>minFaceSize1[0] and bbox1[0][3]>minFaceSize1[1]):
                     faceCam1 = True
-                    cv2.imwrite(historyPicPath + "/cam0/" + str(time.time()) + ".jpg", )
+                    #cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
+                    print("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
                     for (x,y,w,h) in bbox1:
                         cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
 
@@ -140,10 +161,12 @@ def matchFace():
                 print(bbox2[0][2], bbox2[0][3])
                 if(bbox2[0][2]>minFaceSize2[0] and bbox2[0][3]>minFaceSize2[1]):
                     faceCam2 = True
-                    cv2.imwrite(historyPicPath + "/cam1/" + str(time.time()) + ".jpg", )
+                    #cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + ".jpg", pic2 )
+                    print("write to:", historyPicPath + "cam1/" + str(time.time()) + ".jpg")
                     for (x,y,w,h) in bbox2:
                         cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),2)
 
+        print(tmpPic1.shape, seperateBLock.shape, tmpPic2.shape)
         cv2.imshow("SunplusIT", np.hstack((tmpPic1, seperateBLock, tmpPic2)) )
         cv2.waitKey(1)
 
@@ -239,14 +262,24 @@ if(cam2.working() is False):
 faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
 #------------------------------------------------------------------------
 
+createEnv()
+
 while True:
 
     camFace1, camFace2, idList, idYN, idScore = matchFace()
     if(idList is not None):
+        chkList = []
         i = 0
         for id in idList:
             print(idList[i], idYN[i], idScore[i])
 
+            if(idYN[i][0] is True and idYN[i][1] is True):
+                chkList.append((idList[i], (idScore[i][0] + idScore[i][1])/2))
+
             i += 1
 
-        time.sleep(6)
+        print("Final:")
+        print(chkList)
+
+    print("Wait 10 seconds")
+    time.sleep(10)
