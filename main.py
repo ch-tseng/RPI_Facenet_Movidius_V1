@@ -3,12 +3,12 @@
 
 import logging
 from mvnc import mvncapi as mvnc
-#import dlib
+import dlib
 import numpy as np
 import cv2
 import imutils
 from imutils.face_utils import rect_to_bb
-import sys
+import sys, datetime
 import os, time
 import easygui
 from libFacialDoor import webCam
@@ -18,23 +18,27 @@ topDIR ="/media/pi/3A72-2DE1/"
 logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
 faceDetect = "cascade"  #dlib / cascade
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
-FACE_MATCH_THRESHOLD_cam0 = 0.30
-FACE_MATCH_THRESHOLD_cam1 = 0.35
+FACE_MATCH_THRESHOLD_cam0 = 0.50
+FACE_MATCH_THRESHOLD_cam1 = 0.50
+FACE_MATCH_THRESHOLD_avg = 0.35
+
+#webcam_size = ( 640,360)
 webcam_size = ( 352,288)
 
 captureTime = 30  #how long will camera try to capture the face for verify a face
 previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
 cascade_scale = 1.05
-cascade_neighbors = 4
-minFaceSize = (90,90)  #for cascade
-minFaceSize1 = (160,160)  #for send to facenet  webcam1
+cascade_neighbors = 3
+minFaceSize = (200,200)  #for cascade
+minFaceSize1 = (160, 160)  #for send to facenet  webcam1
 minFaceSize2 = (160, 160)  #for send to facenet webcam2
-dlib_detectorRatio = 0
-cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
-cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+dlib_detectorRatio = 1
+
+#cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
+#cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 blankScreen = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
 #-----------------------------------------------------------------------
@@ -173,29 +177,47 @@ def matchFace():
         faceCam1 = False
         faceCam2 = False
         okPic1, pic1 = cam1.takepic(rotate=0, resize=None, savePath=None)
+        print("pic1:", pic1.shape)
         if(okPic1 is not True):
             logging.error("Taking a picture by cam1 is failed!")
         else:
             tmpPic1 = pic1.copy()
+            leftFaceBox = (int(webcam_size[0]/2)-int(minFaceSize[0]/2), int(webcam_size[1]/2)-int(minFaceSize[1]/2))
+            rightFaceBox = (int(webcam_size[0]/2)+int(minFaceSize[0]/2), int(webcam_size[1]/2)+int(minFaceSize[1]/2))
+            print("leftFaceBox:{}, rightFaceBox:{}".format(leftFaceBox, rightFaceBox))
+            cv2.rectangle( tmpPic1,leftFaceBox, rightFaceBox ,(0,0,255),2)
+            cv2.putText(tmpPic1, "webcam:0", (int(webcam_size[0]/2)-50, 20), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255,255,0), 1)
+
             if(faceDetect=='dlib'):
                 bbox1 = getFaces_dlib(pic1)
             else:
                 bbox1 = getFaces_cascade(pic1)
 
+            centerX = 0
+            centerY = 0
+            imgCenterX = webcam_size[0] / 2
+            imgCenterY = webcam_size[1] / 2
             if(len(bbox1)>0):
-                print(bbox1[0][2], bbox1[0][3])
                 if( bbox1[0][2]>minFaceSize1[0] and bbox1[0][3]>minFaceSize1[1]):
-                    faceCam1 = True
-                    cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
-                    logging.debug("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
-                    for (x,y,w,h) in bbox1:
-                        cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
+                    centerX = bbox1[0][0] +  bbox1[0][2]/2
+                    centerY = bbox1[0][1] +  bbox1[0][3]/2
+
+                    if((centerX<imgCenterX+10 and centerX>imgCenterX-10) and (centerY<imgCenterY+10 or centerY>imgCenterY-10)):
+                        faceCam1 = True
+                        cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
+                        logging.debug("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
+                        for (x,y,w,h) in bbox1:
+                            cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
 
         okPic2, pic2 = cam2.takepic(rotate=0, resize=None, savePath=None)
+        print("pic2:", pic2.shape)
         if(okPic2 is not True):
             logging.error("Taking a picture by cam2 is failed!")
         else:
             tmpPic2 = pic2.copy()
+            cv2.putText(tmpPic2, "webcam:1", (int(webcam_size[0]/2)-50, 20), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255,255,0), 1)
+            faceCam2 = True
+            '''
             if(faceDetect=='dlib'):
                 bbox2 = getFaces_dlib(pic2)
             else:
@@ -208,13 +230,15 @@ def matchFace():
                     logging.debug("write to:", historyPicPath + "cam1/" + str(time.time()) + ".jpg")
                     for (x,y,w,h) in bbox2:
                         cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),2)
-
+            '''
         #print(tmpPic1.shape, seperateBLock.shape, tmpPic2.shape)
         #tmpPic1 = imutils.resize(tmpPic1, height=280)
         #tmpPic2 = imutils.resize(tmpPic2, height=280)
         #seperateBLock = imutils.resize(seperateBLock, height=280)
+        print("tmpPic1:{}, seperateBLock:{}, tmpPic2:{}".format(tmpPic1.shape,seperateBLock.shape,tmpPic2.shape))
         cameraArea = imutils.resize(np.hstack((tmpPic1, seperateBLock, tmpPic2)), width=800)
         screen = displayScreen(cameraArea, (0,95))
+
 
         cv2.imshow("SunplusIT", screen)
         cv2.waitKey(1)
@@ -233,6 +257,7 @@ def matchFace():
             idList.append(folderID)
             idYN.append((passYN1, passYN2))
             idScore.append((score1, score2))
+            logging.info("ID:{}, PASS1:{}, PASS2:{}, SCORE1:{}, SCORE2:{}".format(folderID, passYN1, passYN2, score1, score2))
 
     return pic1, pic2, idList, idYN, idScore, screen
 
@@ -247,6 +272,7 @@ while True:
 
     camFace1, camFace2, idList, idYN, idScore, screen = matchFace()
     if(idList is not None):
+        logging.info(datetime.datetime.now())
         chkList = []
         i = 0
         for id in idList:
@@ -267,14 +293,14 @@ while True:
 
             if(chkID(peopleID) is True):
                 for id, score in chkList:
-                    if(int(id) == peopleID):
+                    if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
                         openDoor = True
                         logging.info("   --->Pass, id is {}, score is {}".format(id, score))
 
         if(openDoor is True):
-            cv2.putText(screen, "Pass, door opened!", (160, 420), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2) 
+            cv2.putText(screen, "Pass, door opened!", (180, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2) 
         else:
-            cv2.putText(screen, "Sorry, you are not verified!", (130, 420), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2) 
+            cv2.putText(screen, "Sorry, you are not verified!", (130, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2) 
 
         #time.sleep(10)
 
