@@ -18,9 +18,9 @@ topDIR ="/media/pi/3A72-2DE1/"
 logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
 faceDetect = "cascade"  #dlib / cascade
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
-FACE_MATCH_THRESHOLD_cam0 = 0.50
-FACE_MATCH_THRESHOLD_cam1 = 0.50
-FACE_MATCH_THRESHOLD_avg = 0.35
+FACE_MATCH_THRESHOLD_cam0 = 0.35
+FACE_MATCH_THRESHOLD_cam1 = 0.35
+FACE_MATCH_THRESHOLD_avg = 0.30
 
 #webcam_size = ( 640,360)
 webcam_size = ( 352,288)
@@ -37,8 +37,8 @@ minFaceSize1 = (160, 160)  #for send to facenet  webcam1
 minFaceSize2 = (160, 160)  #for send to facenet webcam2
 dlib_detectorRatio = 1
 
-#cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
-#cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
+cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 blankScreen = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
 #-----------------------------------------------------------------------
@@ -176,7 +176,7 @@ def matchFace():
 
         faceCam1 = False
         faceCam2 = False
-        okPic1, pic1 = cam1.takepic(rotate=0, resize=None, savePath=None)
+        okPic1, pic1 = cam1.takepic(rotate=0, vflip=False, hflip=True, resize=None, savePath=None)
         print("pic1:", pic1.shape)
         if(okPic1 is not True):
             logging.error("Taking a picture by cam1 is failed!")
@@ -209,13 +209,16 @@ def matchFace():
                         for (x,y,w,h) in bbox1:
                             cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
 
-        okPic2, pic2 = cam2.takepic(rotate=0, resize=None, savePath=None)
+        okPic2, pic2 = cam2.takepic(rotate=0, vflip=False, hflip=True, resize=None, savePath=None)
         print("pic2:", pic2.shape)
         if(okPic2 is not True):
             logging.error("Taking a picture by cam2 is failed!")
         else:
             tmpPic2 = pic2.copy()
             cv2.putText(tmpPic2, "webcam:1", (int(webcam_size[0]/2)-50, 20), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255,255,0), 1)
+            if(faceCam1 == True):
+                cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + ".jpg", pic2 )
+
             faceCam2 = True
             '''
             if(faceDetect=='dlib'):
@@ -226,8 +229,9 @@ def matchFace():
             if(len(bbox2)>0):
                 if(bbox2[0][2]>minFaceSize2[0] and bbox2[0][3]>minFaceSize2[1]):
                     faceCam2 = True
-                    cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + ".jpg", pic2 )
-                    logging.debug("write to:", historyPicPath + "cam1/" + str(time.time()) + ".jpg")
+                    if(faceCam1 == True):
+                        cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + ".jpg", pic2 )
+                        logging.debug("write to:", historyPicPath + "cam1/" + str(time.time()) + ".jpg")
                     for (x,y,w,h) in bbox2:
                         cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),2)
             '''

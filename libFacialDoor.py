@@ -17,9 +17,15 @@ class webCam:
         else:
             return False
 
-    def takepic(self, rotate=0, resize=None, savePath=None):
+    def takepic(self, rotate=0, vflip=False, hflip=False, resize=None, savePath=None):
         webcam = self.cam
         hasFrame, frame = webcam.read()
+
+        if(vflip==True):
+            frame = cv2.flip(frame, 0)
+        if(hflip==True):
+            frame = cv2.flip(frame, 1)
+
         if(rotate>0):
             frame = imutils.rotate(frame, rotate)
         if(resize is not None):
