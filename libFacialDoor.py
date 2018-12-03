@@ -37,7 +37,7 @@ class facenetVerify:
     def __init__(self, graphPath, movidiusID=0):
         devices = mvnc.EnumerateDevices()
         if len(devices) == 0:
-            print('No NCS devices found')
+            logging.critical('No NCS devices found')
             quit()
 
         # Pick the first stick to run the network
@@ -103,7 +103,7 @@ class facenetVerify:
         face2_output = self.__run_inference(face2, self.graph)
 
         if (len(face1_output) != len(face2_output)):
-            print('length mismatch in face_match')
+            logging.error('Face for facenet data length mismatch in face_match')
             return False
 
 
