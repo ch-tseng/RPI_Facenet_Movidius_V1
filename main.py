@@ -16,20 +16,22 @@ import os, time
 import easygui
 from libFacialDoor import webCam
 from libFacialDoor import facenetVerify
+from libFacialDoor import mqttFACE
 
 topDIR ="/media/pi/3A72-2DE1/"
 logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
 faceDetect = "cascade"  #dlib / cascade
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 WAV_FOLDER = topDIR + "wav/"
-FACE_MATCH_THRESHOLD_cam0 = 0.35
-FACE_MATCH_THRESHOLD_cam1 = 0.60
-FACE_MATCH_THRESHOLD_avg = 0.55
+FACE_MATCH_THRESHOLD_cam0 = 0.55
+FACE_MATCH_THRESHOLD_cam1 = 0.50
+FACE_MATCH_THRESHOLD_avg = 0.45
 
 #webcam_size = ( 640,360)
 webcam_size = ( 352,288)
 btnCheckin = 14
 
+offsetFaceBox = (2,2)
 captureTime = 30  #how long will camera try to capture the face for verify a face
 previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
@@ -231,7 +233,7 @@ def matchFace():
                     centerX = bbox1[0][0] +  bbox1[0][2]/2
                     centerY = bbox1[0][1] +  bbox1[0][3]/2
 
-                    if((centerX<imgCenterX+10 and centerX>imgCenterX-10) and (centerY<imgCenterY+10 or centerY>imgCenterY-10)):
+                    if((centerX<imgCenterX+offsetFaceBox[0] and centerX>imgCenterX-offsetFaceBox[0]) and (centerY<imgCenterY+offsetFaceBox[1] or centerY>imgCenterY-offsetFaceBox[1])):
                         faceCam1 = True
                         cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
                         logging.debug("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
@@ -300,6 +302,7 @@ faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
 #------------------------------------------------------------------------
 
 createEnv()
+mqttSend = mqttFACE("172.30.16.137","Door-camera",1883)
 
 while True:
     clickCheckin = GPIO.input(btnCheckin)
@@ -335,6 +338,7 @@ while True:
                 cv2.imwrite(validPicPath+str(peopleID)+"/cam1/"+filename, camFace2)
                 for id, score in chkList:
                     if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
+                        mqttSend.sendMQTT("3000e2005011040f01011740613f")
                         openDoor = True
                         logging.info("   --->Pass, id is {}, score is {}".format(id, score))
             else:
@@ -356,9 +360,9 @@ while True:
 
         screen = blackScreen()
 
-        if(screen is not None):
-            cv2.imshow("SunplusIT", screen )
-            cv2.waitKey(1)
+        #if(screen is not None):
+        cv2.imshow("SunplusIT", screen )
+        cv2.waitKey(1)
 
         #print("Wait 10 seconds")
         #time.sleep(2)

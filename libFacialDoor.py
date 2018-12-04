@@ -3,6 +3,7 @@ import imutils
 import cv2
 import numpy as np
 from mvnc import mvncapi as mvnc
+import paho.mqtt.client as mqtt
 
 class webCam:
     def __init__(self, id, size=(320, 240)):
@@ -129,3 +130,15 @@ class facenetVerify:
             # they didn't match.
             #print('No pass! difference is: ' + str(total_diff))
             return False, total_diff
+
+class mqttFACE():
+    def __init__(self, host, chnl, portnum):
+        self.host = host
+        self.channel = chnl
+        self.port = portnum
+
+    def sendMQTT(self, msg):
+        mqttc = mqtt.Client("Face-Checkin")
+        mqttc.username_pw_set("chtseng", "chtseng")
+        mqttc.connect(self.host, self.port)
+        mqttc.publish(self.channel, msg)
