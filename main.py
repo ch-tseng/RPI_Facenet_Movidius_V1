@@ -1,6 +1,9 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import RPi.GPIO as GPIO 
+GPIO.setmode(GPIO.BCM)
+
 import logging
 from mvnc import mvncapi as mvnc
 import dlib
@@ -18,12 +21,14 @@ topDIR ="/media/pi/3A72-2DE1/"
 logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
 faceDetect = "cascade"  #dlib / cascade
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
+WAV_FOLDER = topDIR + "wav/"
 FACE_MATCH_THRESHOLD_cam0 = 0.35
-FACE_MATCH_THRESHOLD_cam1 = 0.35
-FACE_MATCH_THRESHOLD_avg = 0.30
+FACE_MATCH_THRESHOLD_cam1 = 0.60
+FACE_MATCH_THRESHOLD_avg = 0.55
 
 #webcam_size = ( 640,360)
 webcam_size = ( 352,288)
+btnCheckin = 14
 
 captureTime = 30  #how long will camera try to capture the face for verify a face
 previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
@@ -32,15 +37,17 @@ validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
 cascade_scale = 1.05
 cascade_neighbors = 3
-minFaceSize = (200,200)  #for cascade
+minFaceSize = (180,180)  #for cascade
 minFaceSize1 = (160, 160)  #for send to facenet  webcam1
 minFaceSize2 = (160, 160)  #for send to facenet webcam2
 dlib_detectorRatio = 1
 
-cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
-cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+GPIO.setup(btnCheckin, GPIO.IN)
+#cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
+#cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 blankScreen = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
+seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
 #-----------------------------------------------------------------------
 
 def createEnv():
@@ -67,6 +74,23 @@ def createEnv():
     if not os.path.exists(historyPicPath+"/cam1"):
         os.makedirs(historyPicPath+"/cam1")
         logging.info("Pics for history path created:", historyPicPath+"/cam1")
+
+def regID(id, pic1, pic2):
+    userPath = validPicPath + id + "/"
+    validated_image_filename0 = userPath + "cam0/valid.jpg"
+    validated_image_filename1 = userPath + "cam1/valid.jpg"
+
+    if not os.path.exists(userPath):
+        os.makedirs(userPath)
+    if not os.path.exists(userPath+"cam0"):
+        os.makedirs(userPath+"cam0")
+    if not os.path.exists(userPath+"cam1"):
+        os.makedirs(userPath+"cam1")
+
+    cv2.imwrite(validated_image_filename0, pic1)
+    cv2.imwrite(validated_image_filename1, pic2)
+
+    logging.info(id+" path registered:", userPath)
 
 def getFaces_dlib(img):
     detector = dlib.get_frontal_face_detector()
@@ -119,6 +143,11 @@ def displayScreen(img=None, overlay=None):
     #cv2.imshow("SunplusIT", board )
     #cv2.waitKey(1)
 
+def blackScreen():
+    cameraArea = imutils.resize(np.hstack((blankScreen, seperateBLock, blankScreen )), width=800)
+    screen = displayScreen(cameraArea, (0,95))
+    return screen
+
 #def printText(text=None, color=(0,0,0)):
 #    if(text is not None):
 #        board = cv2.imread("board.png")
@@ -151,7 +180,7 @@ def matchFace():
     okPic2 = True
     #tmpPic1 = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
     #tmpPic2 = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
-    seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
+    #seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
 
     idList = []
     idYN = []
@@ -273,44 +302,63 @@ faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
 createEnv()
 
 while True:
+    clickCheckin = GPIO.input(btnCheckin)
+    #print(clickCheckin)
+    if(clickCheckin == 0):
+        os.system('aplay ' + WAV_FOLDER + 'start_test.wav')
 
-    camFace1, camFace2, idList, idYN, idScore, screen = matchFace()
-    if(idList is not None):
-        logging.info(datetime.datetime.now())
-        chkList = []
-        i = 0
-        for id in idList:
-            logging.debug(idList[i], idYN[i], idScore[i])
+        camFace1, camFace2, idList, idYN, idScore, screen = matchFace()
+        if(idList is not None):
+            logging.info(datetime.datetime.now())
+            chkList = []
+            i = 0
+            for id in idList:
+                logging.debug(idList[i], idYN[i], idScore[i])
 
-            if(idYN[i][0] is True and idYN[i][1] is True):
-                chkList.append((idList[i], (idScore[i][0] + idScore[i][1])/2))
-                logging.info("      ---> scores are all pass, added to chkList.")
-            i += 1
+                if(idYN[i][0] is True and idYN[i][1] is True):
+                    chkList.append((idList[i], (idScore[i][0] + idScore[i][1])/2))
+                    logging.info("      ---> scores are all pass, added to chkList.")
+                i += 1
 
-        logging.info("Final pass list:")
-        logging.info(chkList)
+            logging.info("Final pass list:")
+            logging.info(chkList)
 
-        openDoor = False
-        if(len(chkList)>0):
+            openDoor = False
+            #if(len(chkList)>0):
+            os.system('aplay ' + WAV_FOLDER + 'inputid.wav')
             peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
             logging.info("User keyin the employee id:", peopleID)
 
             if(chkID(peopleID) is True):
+                filename = str(time.time()) + ".jpg"
+                cv2.imwrite(validPicPath+str(peopleID)+"/cam0/"+filename, camFace1)
+                cv2.imwrite(validPicPath+str(peopleID)+"/cam1/"+filename, camFace2)
                 for id, score in chkList:
                     if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
                         openDoor = True
                         logging.info("   --->Pass, id is {}, score is {}".format(id, score))
+            else:
+                regID(str(peopleID), camFace1, camFace2)
+                os.system('aplay ' + WAV_FOLDER + 'adduser.wav')
+                #easygui.msgbox('已新增您的人臉辨識設定。')
 
-        if(openDoor is True):
-            cv2.putText(screen, "Pass, door opened!", (180, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2) 
-        else:
-            cv2.putText(screen, "Sorry, you are not verified!", (130, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2) 
+            if(openDoor is True):
+                cv2.putText(screen, "Pass, door opened!", (180, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2) 
+                os.system('aplay ' + WAV_FOLDER + 'verifyok.wav')
+            else:
+                cv2.putText(screen, "Sorry, you are not verified!", (130, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2) 
+                os.system('aplay ' + WAV_FOLDER + 'verifyfail.wav')
 
-        #time.sleep(10)
+            cv2.imshow("SunplusIT", screen )
+            cv2.waitKey(1)
+            #time.sleep(3)
+            os.system('aplay ' + WAV_FOLDER + 'thankyou.wav')
 
-    if(screen is not None):
-        cv2.imshow("SunplusIT", screen )
-        cv2.waitKey(1)
+        screen = blackScreen()
 
-    #print("Wait 10 seconds")
-    time.sleep(2)
+        if(screen is not None):
+            cv2.imshow("SunplusIT", screen )
+            cv2.waitKey(1)
+
+        #print("Wait 10 seconds")
+        #time.sleep(2)
