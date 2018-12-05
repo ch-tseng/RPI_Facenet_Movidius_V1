@@ -18,6 +18,7 @@ from libFacialDoor import webCam
 from libFacialDoor import facenetVerify
 from libFacialDoor import mqttFACE
 
+KeyInID = False
 topDIR ="/media/pi/3A72-2DE1/"
 logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
 faceDetect = "cascade"  #dlib / cascade
@@ -31,15 +32,15 @@ FACE_MATCH_THRESHOLD_avg = 0.45
 webcam_size = ( 352,288)
 btnCheckin = 14
 
-offsetFaceBox = (2,2)
-captureTime = 30  #how long will camera try to capture the face for verify a face
+offsetFaceBox = (10,10)
+captureTime = 60  #how long will camera try to capture the face for verify a face
 previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
 cascade_scale = 1.05
 cascade_neighbors = 3
-minFaceSize = (180,180)  #for cascade
+minFaceSize = (160,160)  #for cascade
 minFaceSize1 = (160, 160)  #for send to facenet  webcam1
 minFaceSize2 = (160, 160)  #for send to facenet webcam2
 dlib_detectorRatio = 1
@@ -153,6 +154,11 @@ def blackScreen():
 #def printText(text=None, color=(0,0,0)):
 #    if(text is not None):
 #        board = cv2.imread("board.png")
+
+def readNumber(num):
+    for i in range(0, len(num)):
+        print("play", WAV_FOLDER + "number/" + num[i] + ".wav")
+        os.system('aplay ' + WAV_FOLDER + "number/" + num[i] + ".wav")
 
 def matchFace():
     tmpPic1 = blankScreen.copy()
@@ -302,7 +308,7 @@ faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
 #------------------------------------------------------------------------
 
 createEnv()
-mqttSend = mqttFACE("172.30.16.137","Door-camera",1883)
+#mqttSend = mqttFACE("172.30.16.137","Door-camera",1883)
 
 while True:
     clickCheckin = GPIO.input(btnCheckin)
@@ -327,36 +333,59 @@ while True:
             logging.info(chkList)
 
             openDoor = False
-            #if(len(chkList)>0):
-            os.system('aplay ' + WAV_FOLDER + 'inputid.wav')
-            peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
-            logging.info("User keyin the employee id:", peopleID)
 
-            if(chkID(peopleID) is True):
-                filename = str(time.time()) + ".jpg"
-                cv2.imwrite(validPicPath+str(peopleID)+"/cam0/"+filename, camFace1)
-                cv2.imwrite(validPicPath+str(peopleID)+"/cam1/"+filename, camFace2)
-                for id, score in chkList:
-                    if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
-                        mqttSend.sendMQTT("3000e2005011040f01011740613f")
-                        openDoor = True
-                        logging.info("   --->Pass, id is {}, score is {}".format(id, score))
+            if(KeyInID is True):
+                #if(len(chkList)>0):
+                os.system('aplay ' + WAV_FOLDER + 'inputid.wav')
+                peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
+                logging.info("User keyin the employee id:", peopleID)
+
+                if(chkID(peopleID) is True):
+                    filename = str(time.time()) + ".jpg"
+                    cv2.imwrite(validPicPath+str(peopleID)+"/cam0/"+filename, camFace1)
+                    cv2.imwrite(validPicPath+str(peopleID)+"/cam1/"+filename, camFace2)
+                    for id, score in chkList:
+                        if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
+                            mqttSend.sendMQTT("3000e2005011040f01011740613f")
+                            openDoor = True
+                            logging.info("   --->Pass, id is {}, score is {}".format(id, score))
+                else:
+                    regID(str(peopleID), camFace1, camFace2)
+                    os.system('aplay ' + WAV_FOLDER + 'adduser.wav')
+                    #easygui.msgbox('已新增您的人臉辨識設定。')
+
             else:
-                regID(str(peopleID), camFace1, camFace2)
-                os.system('aplay ' + WAV_FOLDER + 'adduser.wav')
-                #easygui.msgbox('已新增您的人臉辨識設定。')
+                peopleID = 0
+                if(len(chkList)>0):
+                    smallist = 999
+                    for id, (ID, score) in enumerate(chkList):
+                        if(score<smallist):
+                            smallist = score
+                            peopleID = str(ID)
+
+                    if(smallist<FACE_MATCH_THRESHOLD_avg):
+                        openDoor = True
 
             if(openDoor is True):
-                cv2.putText(screen, "Pass, door opened!", (180, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2) 
-                os.system('aplay ' + WAV_FOLDER + 'verifyok.wav')
+                #cv2.putText(screen, "ID:{} passed, open the door for you!".format(peopleID), (160, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2)
+                cv2.putText(screen, "Your ID is {}, your are verified!".format(peopleID), (100, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2)
+                cv2.imshow("SunplusIT", screen )
+                cv2.waitKey(1)
+                os.system('aplay ' + WAV_FOLDER + 'your_id_is.wav')
+                readNumber(str(peopleID))
+                os.system('aplay ' + WAV_FOLDER + 'checkin_opendoor.wav')
             else:
-                cv2.putText(screen, "Sorry, you are not verified!", (130, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2) 
-                os.system('aplay ' + WAV_FOLDER + 'verifyfail.wav')
+                #cv2.putText(screen, "Sorry, your ID:{} are not verified!".format(peopleID), (120, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2) 
+                cv2.putText(screen, "Sorry, you are not verified!", (120, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2)
+                cv2.imshow("SunplusIT", screen )
+                cv2.waitKey(1)
+                os.system('aplay ' + WAV_FOLDER + 'sorry_verify_fail.wav')
 
-            cv2.imshow("SunplusIT", screen )
-            cv2.waitKey(1)
+            screen = blackScreen()
+            #cv2.imshow("SunplusIT", screen )
+            #cv2.waitKey(1)
             #time.sleep(3)
-            os.system('aplay ' + WAV_FOLDER + 'thankyou.wav')
+            #os.system('aplay ' + WAV_FOLDER + 'thankyou.wav')
 
         screen = blackScreen()
 
