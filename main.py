@@ -42,9 +42,9 @@ validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
 cascade_scale = 1.05
 cascade_neighbors = 3
-minFaceSize = (160,160)  #for cascade
+minFaceSize = (140,140)  #for cascade
 minFaceSize1 = (160, 160)  #for send to facenet  webcam1
-minFaceSize2 = (160, 160)  #for send to facenet webcam2
+minFaceSize2 = (130, 130)  #for send to facenet webcam2
 dlib_detectorRatio = 1
 
 GPIO.setup(btnCheckin, GPIO.IN)
