@@ -19,16 +19,17 @@ from libFacialDoor import facenetVerify
 import requests
 #from libFacialDoor import mqttFACE
 
-KeyInID = False
+#KeyInID = False
+runMode = 1  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
 topDIR ="/media/pi/3A72-2DE1/"
 toWebserver = "/var/www/html/door/"
 logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
 faceDetect = "cascade"  #dlib / cascade
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 WAV_FOLDER = "/home/pi/works/door_face/wav/"
-FACE_MATCH_THRESHOLD_cam0 = 0.35
-FACE_MATCH_THRESHOLD_cam1 = 0.35
-FACE_MATCH_THRESHOLD_avg = 0.30
+FACE_MATCH_THRESHOLD_cam0 = 0.40
+FACE_MATCH_THRESHOLD_cam1 = 0.40
+FACE_MATCH_THRESHOLD_avg = 0.38
 
 #webcam_size = ( 640,360)
 webcam_size = ( 352,288)
@@ -193,7 +194,7 @@ def callWebServer(id, pic1, pic2, result):
     logging.info("end posting:{}".format(datetime.datetime.now()))
     logging.info(r)
 
-def matchFace():
+def matchFace(this_ID=None):
     tmpPic1 = blankScreen.copy()
     tmpPic2 = blankScreen.copy()
 
@@ -324,23 +325,36 @@ def matchFace():
     #Play start to recognize....
     os.system('/usr/bin/aplay ' + WAV_FOLDER + 'recognize.wav')
 
-    for folderID in os.listdir(validPicPath):
-        if os.path.exists(validPicPath + folderID + "/cam0/valid.jpg") and \
-                os.path.exists(validPicPath + folderID + "/cam1/valid.jpg"):
+    if(runMode==1 or runMode==3):
+        for folderID in os.listdir(validPicPath):
+            if os.path.exists(validPicPath + folderID + "/cam0/valid.jpg") and \
+                    os.path.exists(validPicPath + folderID + "/cam1/valid.jpg"):
 
-            valid0 = cv2.imread(validPicPath + folderID + "/cam0/valid.jpg")
-            valid1 = cv2.imread(validPicPath + folderID + "/cam1/valid.jpg")
+                valid0 = cv2.imread(validPicPath + folderID + "/cam0/valid.jpg")
+                valid1 = cv2.imread(validPicPath + folderID + "/cam1/valid.jpg")
 
-            passYN1, score1 = faceCheck.face_match(face1=faceArea1, face2=valid0, threshold=FACE_MATCH_THRESHOLD_cam0)
-            passYN2, score2 = faceCheck.face_match(face1=faceArea2, face2=valid1, threshold=FACE_MATCH_THRESHOLD_cam1)
+                passYN1, score1 = faceCheck.face_match(face1=faceArea1, face2=valid0, threshold=FACE_MATCH_THRESHOLD_cam0)
+                passYN2, score2 = faceCheck.face_match(face1=faceArea2, face2=valid1, threshold=FACE_MATCH_THRESHOLD_cam1)
 
-            idList.append(folderID)
-            idYN.append((passYN1, passYN2))
-            idScore.append((score1, score2))
-            logging.info("ID:{}, PASS1:{}, PASS2:{}, SCORE1:{}, SCORE2:{}".format(folderID, passYN1, passYN2, score1, score2))
+                idList.append(folderID)
+                idYN.append((passYN1, passYN2))
+                idScore.append((score1, score2))
+                logging.info("ID:{}, PASS1:{}, PASS2:{}, SCORE1:{}, SCORE2:{}".format(folderID, passYN1, passYN2, score1, score2))
+
+    elif(runMode == 2):
+        valid0 = cv2.imread(validPicPath + this_ID + "/cam0/valid.jpg")
+        valid1 = cv2.imread(validPicPath + this_ID + "/cam1/valid.jpg")
+        passYN1, score1 = faceCheck.face_match(face1=faceArea1, face2=valid0, threshold=FACE_MATCH_THRESHOLD_cam0)
+        passYN2, score2 = faceCheck.face_match(face1=faceArea2, face2=valid1, threshold=FACE_MATCH_THRESHOLD_cam1)
+        idList.append(folderID)
+        idYN.append((passYN1, passYN2))
+        idScore.append((score1, score2))
+        logging.info("ID:{}, PASS1:{}, PASS2:{}, SCORE1:{}, SCORE2:{}".format(folderID, passYN1, passYN2, score1, score2))
+
+    elif(runMode == 0):
+        idList = idYN = idScore = None 
 
     return (pic1,faceArea1), (pic2, faceArea2), idList, idYN, idScore, screen
-
 
 
 faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
@@ -356,11 +370,20 @@ while True:
     clickCheckin = GPIO.input(btnCheckin)
     #print(clickCheckin)
     if(clickCheckin == 0):
+        logging.info(datetime.datetime.now())
         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'welcome.wav')
 
-        (camFace1, faceArea1), (camFace2, faceArea2), idList, idYN, idScore, screen = matchFace()
+        if(runMode == 0 or runMode == 1 or runMode == 2):
+            os.system('/usr/bin/aplay ' + WAV_FOLDER + 'inputid.wav')
+            peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
+            logging.info("User keyin the employee id:", peopleID)
+
+        else:
+            peopleID = 0
+
+        (camFace1, faceArea1), (camFace2, faceArea2), idList, idYN, idScore, screen = matchFace(this_ID=peopleID)
+
         if(idList is not None):
-            logging.info(datetime.datetime.now())
             chkList = []
             i = 0
             for id in idList:
@@ -376,30 +399,33 @@ while True:
 
             openDoor = False
 
-            if(KeyInID is True):
+            if(runMode == 0 or runMode == 1 or runMode == 2):
                 #if(len(chkList)>0):
-                os.system('/usr/bin/aplay ' + WAV_FOLDER + 'inputid.wav')
-                peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
-                logging.info("User keyin the employee id:", peopleID)
+                #os.system('/usr/bin/aplay ' + WAV_FOLDER + 'inputid.wav')
+                #peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
+                #logging.info("User keyin the employee id:", peopleID)
 
-                if(chkID(peopleID) is True):
+                if(runMode == 0):  #add the new user
                     filename = str(time.time()) + ".jpg"
-                    cv2.imwrite(validPicPath+str(peopleID)+"/cam0/"+filename, camFace1)
-                    cv2.imwrite(validPicPath+str(peopleID)+"/cam1/"+filename, camFace2)
-                    cv2.imwrite(validPicPath+str(peopleID)+"/cam0/"+filename, faceArea1)
-                    cv2.imwrite(validPicPath+str(peopleID)+"/cam1/"+filename, faceArea2)
 
+                    if(chkID(peopleID) is True):
+                        os.rename(validPicPath+str(peopleID)+"/cam0/valid.jpg", validPicPath+str(peopleID)+"/cam0/"+filename)
+                        os.rename(validPicPath+str(peopleID)+"/cam1/valid.jpg", validPicPath+str(peopleID)+"/cam1/"+filename)
+
+                    cv2.imwrite(historyPicPath+str(peopleID)+"/cam0/valid.jpg", camFace1)
+                    cv2.imwrite(historyPicPath+str(peopleID)+"/cam1/valid.jpg", camFace2)
+                    cv2.imwrite(validPicPath+str(peopleID)+"/cam0/valid.jpg", faceArea1)
+                    cv2.imwrite(validPicPath+str(peopleID)+"/cam1/valid.jpg"+filename, faceArea2)
+                    os.system('/usr/bin/aplay ' + WAV_FOLDER + 'photo_saved.wav')
+
+                elif(runMode == 1 or runMode == 2): 
                     for id, score in chkList:
                         if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
-                            #mqttSend.sendMQTT("3000e2005011040f01011740613f")
                             openDoor = True
                             logging.info("   --->Pass, id is {}, score is {}".format(id, score))
-                else:
-                    regID(str(peopleID), faceArea1, faceArea2)
-                    os.system('/usr/bin/aplay ' + WAV_FOLDER + 'adduser.wav')
-                    #easygui.msgbox('已新增您的人臉辨識設定。')
 
-            else:
+
+            elif(runMode==3):
                 peopleID = 0
                 if(len(chkList)>0):
                     smallist = 999
@@ -411,15 +437,16 @@ while True:
                     if(smallist<FACE_MATCH_THRESHOLD_avg):
                         openDoor = True
 
+
             if(openDoor is True):
                 logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
                 callWebServer(str(peopleID), camFace1, camFace2, openDoor)
                 cv2.putText(screen, "Your ID is {}, your are verified!".format(peopleID), (20, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2)
                 cv2.imshow("SunplusIT", screen )
                 cv2.waitKey(1)
-                os.system('/usr/bin/aplay ' + WAV_FOLDER + 'your_id_is.wav')
-                readNumber(str(peopleID))
-                os.system('/usr/bin/aplay ' + WAV_FOLDER + 'checkin_opendoor.wav')
+                os.system('/usr/bin/aplay ' + WAV_FOLDER + 'opendoor.wav')
+                #readNumber(str(peopleID))
+                #os.system('/usr/bin/aplay ' + WAV_FOLDER + 'checkin_opendoor.wav')
             else:
                 logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
                 callWebServer(str(peopleID), camFace1, camFace2, openDoor)
