@@ -40,15 +40,15 @@ previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
-cascade_scale = 1.1
-cascade_neighbors = 5
+cascade_scale = 1.2
+cascade_neighbors = 6
 minFaceSize = (140,140)  #for cascade
-minFaceSize1 = (160, 160)  #for send to facenet  webcam1
-minFaceSize2 = (130, 130)  #for send to facenet webcam2
+minFaceSize1 = (180, 180)  #for send to facenet  webcam1
+minFaceSize2 = (140, 140)  #for send to facenet webcam2
 dlib_detectorRatio = 1
 
-posturl="http://172.30.8.86/api/DoorFaceDetection"
-
+#posturl="http://172.30.8.86/api/DoorFaceDetection"
+posturl="http://api.sunplusit.com/api/DoorFaceDetection"
 GPIO.setup(btnCheckin, GPIO.IN)
 cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
 cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
@@ -188,7 +188,9 @@ def callWebServer(id, pic1, pic2, result):
     }
 
     logging.info(data)
+    logging.info("start posting: {}".format(datetime.datetime.now()))
     r = requests.post(posturl, data=data).text
+    logging.info("end posting:{}".format(datetime.datetime.now()))
     logging.info(r)
 
 def matchFace():
@@ -319,6 +321,8 @@ def matchFace():
         cv2.imshow("SunplusIT", screen)
         cv2.waitKey(1)
     #----------------------
+    #Play start to recognize....
+    os.system('/usr/bin/aplay ' + WAV_FOLDER + 'recognize.wav')
 
     for folderID in os.listdir(validPicPath):
         if os.path.exists(validPicPath + folderID + "/cam0/valid.jpg") and \
@@ -343,6 +347,10 @@ faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
 #------------------------------------------------------------------------
 
 createEnv()
+
+screen = blackScreen()
+cv2.imshow("SunplusIT", screen )
+cv2.waitKey(1)
 
 while True:
     clickCheckin = GPIO.input(btnCheckin)
@@ -404,6 +412,7 @@ while True:
                         openDoor = True
 
             if(openDoor is True):
+                logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
                 callWebServer(str(peopleID), camFace1, camFace2, openDoor)
                 cv2.putText(screen, "Your ID is {}, your are verified!".format(peopleID), (20, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2)
                 cv2.imshow("SunplusIT", screen )
@@ -412,6 +421,7 @@ while True:
                 readNumber(str(peopleID))
                 os.system('/usr/bin/aplay ' + WAV_FOLDER + 'checkin_opendoor.wav')
             else:
+                logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
                 callWebServer(str(peopleID), camFace1, camFace2, openDoor)
                 cv2.putText(screen, "Sorry, you are not verified!", (80, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2)
                 cv2.imshow("SunplusIT", screen )
@@ -421,10 +431,6 @@ while True:
             screen = blackScreen()
             cv2.imshow("SunplusIT", screen )
             cv2.waitKey(1)
-            #callWebServer(str(peopleID), camFace1, camFace2, openDoor)
-            #time.sleep(3)
-
-            #os.system('/usr/bin/aplay ' + WAV_FOLDER + 'thankyou.wav')
 
         screen = blackScreen()
 
@@ -434,3 +440,5 @@ while True:
 
         #print("Wait 10 seconds")
         #time.sleep(2)
+    else:
+        cv2.waitKey(1)
