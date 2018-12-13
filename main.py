@@ -67,7 +67,6 @@ def mouseClick(event,x,y,flags,param):
 def getKeyin(x, y, bg):
     keyin = None
     color = bg[y, x]
-    print("Color:", color)
     b, g, r = color[0], color[1], color[2]
     if( b==255 and g==255 and r==255 ):
         keyin = "0"
@@ -120,6 +119,7 @@ def keyinID():
                     numChar = numChar + charKeyin
                 else:
                     if(charKeyin=="E"):
+                        os.system('/usr/bin/aplay ' + WAV_FOLDER + 'waitplease.wav')
                         keyin = False
                     if(charKeyin=="D"):
                         if(len(numChar)>1):
@@ -286,8 +286,7 @@ def callWebServer(id, pic1, pic2, result):
     logging.info(r)
 
 def matchFace(this_ID=None):
-    if(this_ID==0): this_ID=None
-
+    logging.info("Mach face for ID:{}".format(this_ID))
     tmpPic1 = blankScreen.copy()
     tmpPic2 = blankScreen.copy()
 
@@ -439,10 +438,10 @@ def matchFace(this_ID=None):
         valid1 = cv2.imread(validPicPath + this_ID + "/cam1/valid.jpg")
         passYN1, score1 = faceCheck.face_match(face1=faceArea1, face2=valid0, threshold=FACE_MATCH_THRESHOLD_cam0)
         passYN2, score2 = faceCheck.face_match(face1=faceArea2, face2=valid1, threshold=FACE_MATCH_THRESHOLD_cam1)
-        idList.append(folderID)
+        idList.append(this_ID)
         idYN.append((passYN1, passYN2))
         idScore.append((score1, score2))
-        logging.info("ID:{}, PASS1:{}, PASS2:{}, SCORE1:{}, SCORE2:{}".format(folderID, passYN1, passYN2, score1, score2))
+        logging.info("ID:{}, PASS1:{}, PASS2:{}, SCORE1:{}, SCORE2:{}".format(this_ID, passYN1, passYN2, score1, score2))
 
     elif(runMode == 0):
         idList = idYN = idScore = None 
@@ -471,13 +470,14 @@ while True:
             os.system('/usr/bin/aplay ' + WAV_FOLDER + 'inputid.wav')
             #peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
             peopleID = keyinID()
+            print(peopleID)
             logging.info("User keyin the employee id:", peopleID)
 
         else:
             peopleID = 0
 
         if((peopleID == 0 and runMode==3) or (peopleID !=0 and runMode!=3)):
-            (camFace1, faceArea1), (camFace2, faceArea2), idList, idYN, idScore, screen = matchFace(this_ID=peopleID)
+            (camFace1, faceArea1), (camFace2, faceArea2), idList, idYN, idScore, screen = matchFace(this_ID=str(peopleID))
 
             if(idList is not None):
                 chkList = []
