@@ -20,7 +20,7 @@ import requests
 #from libFacialDoor import mqttFACE
 
 #KeyInID = False
-runMode = 0  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
+runMode = 2  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
 topDIR ="/media/pi/3A72-2DE1/"
 toWebserver = "/var/www/html/door/"
 logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
@@ -48,7 +48,6 @@ minFaceSize1 = (165, 165)  #for send to facenet  webcam1
 minFaceSize2 = (140, 140)  #for send to facenet webcam2
 dlib_detectorRatio = 1
 
-#posturl="http://172.30.8.86/api/DoorFaceDetection"
 posturl="http://api.sunplusit.com/api/DoorFaceDetection"
 GPIO.setup(btnCheckin, GPIO.IN)
 cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
@@ -57,6 +56,97 @@ cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN
 blankScreen = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
 seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
 #-----------------------------------------------------------------------
+
+def mouseClick(event,x,y,flags,param):
+    global ix, iy
+
+    if event == 4:
+        ix,iy = x,y
+        #print(event)
+
+def getKeyin(x, y, bg):
+    keyin = None
+    color = bg[y, x]
+    print("Color:", color)
+    b, g, r = color[0], color[1], color[2]
+    if( b==255 and g==255 and r==255 ):
+        keyin = "0"
+    elif( b==254 and g==254 and r==254 ):
+        keyin = "1"
+    elif( b==253 and g==253 and r==253 ):
+        keyin = "2"
+    elif( b==252 and g==252 and r==252 ):
+        keyin = "3"
+    elif( b==251 and g==251 and r==251 ):
+        keyin = "4"
+    elif( b==250 and g==250 and r==250 ):
+        keyin = "5"
+    elif( b==249 and g==249 and r==249 ):
+        keyin = "6"
+    elif( b==248 and g==248 and r==248 ):
+        keyin = "7"
+    elif( b==247 and g==247 and r==247 ):
+        keyin = "8"
+    elif( b==246 and g==246 and r==246 ):
+        keyin = "9"
+    elif( b==245 and g==245 and r==245 ):
+        keyin = "D"
+    elif( b==244 and g==244 and r==244 ):
+        keyin = "C"
+    elif( b==243 and g==243 and r==243 ):
+        keyin = "E"
+
+    return keyin
+
+def keyinID():
+    global ix, iy
+
+    ix = iy = -1
+    keyboard = cv2.imread("keyboard.png")
+    bg_keyboard = cv2.imread("keyboard_color.png")
+    cv2.imshow("SunplusIT", keyboard)
+    cv2.waitKey(1)
+
+    cv2.setMouseCallback("SunplusIT" , mouseClick)
+    keyin = True
+    numChar = ""
+    while keyin is True:
+        #print("Keyin:",numChar)
+        if( ((ix>36 and iy>207) and (ix<767 and iy<454)) or ((ix>570 and iy>50) and (ix<767 and iy<154)) ):
+            charKeyin = getKeyin(ix, iy, bg_keyboard)
+            ix = iy = -1
+            if(charKeyin is not None):
+                if(charKeyin!="E" and charKeyin!="D" and charKeyin!="C"):
+                    numChar = numChar + charKeyin
+                else:
+                    if(charKeyin=="E"):
+                        keyin = False
+                    if(charKeyin=="D"):
+                        if(len(numChar)>1):
+                            numChar = numChar[0:len(numChar)-1]
+                        else:
+                            numChar = ""
+                    if(charKeyin=="C"):
+                        keyin = False
+                        numChar = ""
+
+        keyboard = cv2.imread("keyboard.png")
+        cv2.putText(keyboard, numChar, (50,130), cv2.FONT_HERSHEY_SIMPLEX, 2, (0,255,0), 2)
+        cv2.imshow("SunplusIT", keyboard)
+        cv2.waitKey(1)
+
+    screen = blackScreen()
+    cv2.imshow("SunplusIT", screen )
+    cv2.waitKey(1)
+
+    cv2.setMouseCallback("SunplusIT" , lambda *args : None)
+
+    if(numChar==""):
+        return 0
+    else:
+        print("Retrun:", int(numChar))
+        return int(numChar)
+
 
 def createEnv():
     if not os.path.exists(validPicPath):
@@ -131,7 +221,8 @@ def getFaces_cascade(img):
 
 def chkID(id):
     if not os.path.exists(validPicPath + str(id)):
-        easygui.msgbox('這個ID{}還沒有申請刷臉打卡！'.format(id))
+
+        #easygui.msgbox('這個ID{}還沒有申請刷臉打卡！'.format(id))
         return False
     else:
         if(os.path.exists(validPicPath + str(id) + '/cam0/valid.jpg') and \
@@ -195,6 +286,8 @@ def callWebServer(id, pic1, pic2, result):
     logging.info(r)
 
 def matchFace(this_ID=None):
+    if(this_ID==0): this_ID=None
+
     tmpPic1 = blankScreen.copy()
     tmpPic2 = blankScreen.copy()
 
@@ -368,6 +461,7 @@ cv2.waitKey(1)
 
 while True:
     clickCheckin = GPIO.input(btnCheckin)
+    idList = None
     #print(clickCheckin)
     if(clickCheckin == 0):
         logging.info(datetime.datetime.now())
@@ -375,91 +469,93 @@ while True:
 
         if(runMode == 0 or runMode == 1 or runMode == 2):
             os.system('/usr/bin/aplay ' + WAV_FOLDER + 'inputid.wav')
-            peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
+            #peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
+            peopleID = keyinID()
             logging.info("User keyin the employee id:", peopleID)
 
         else:
             peopleID = 0
 
-        (camFace1, faceArea1), (camFace2, faceArea2), idList, idYN, idScore, screen = matchFace(this_ID=peopleID)
+        if((peopleID == 0 and runMode==3) or (peopleID !=0 and runMode!=3)):
+            (camFace1, faceArea1), (camFace2, faceArea2), idList, idYN, idScore, screen = matchFace(this_ID=peopleID)
 
-        if(idList is not None):
-            chkList = []
-            i = 0
-            for id in idList:
-                logging.debug(idList[i], idYN[i], idScore[i])
+            if(idList is not None):
+                chkList = []
+                i = 0
+                for id in idList:
+                    logging.debug(idList[i], idYN[i], idScore[i])
 
-                if(idYN[i][0] is True and idYN[i][1] is True):
-                    chkList.append((idList[i], (idScore[i][0] + idScore[i][1])/2))
-                    logging.info("      ---> scores are all pass, added to chkList.")
-                i += 1
+                    if(idYN[i][0] is True and idYN[i][1] is True):
+                        chkList.append((idList[i], (idScore[i][0] + idScore[i][1])/2))
+                        logging.info("      ---> scores are all pass, added to chkList.")
+                    i += 1
 
-            logging.info("Final pass list:")
-            logging.info(chkList)
+                logging.info("Final pass list:")
+                logging.info(chkList)
 
-            openDoor = False
-
-
-            if(runMode==1 or runMode==2):
-                for id, score in chkList:
-                    if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
-                        openDoor = True
-                        logging.info("   --->Pass, id is {}, score is {}".format(id, score))
+                openDoor = False
 
 
-            elif(runMode==3):
-                peopleID = 0
-                if(len(chkList)>0):
-                    smallist = 999
-                    for id, (ID, score) in enumerate(chkList):
-                        if(score<smallist):
-                            smallist = score
-                            peopleID = str(ID)
-
-                    if(smallist<FACE_MATCH_THRESHOLD_avg):
-                        openDoor = True
+                if(runMode==1 or runMode==2):
+                    for id, score in chkList:
+                        if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
+                            openDoor = True
+                            logging.info("   --->Pass, id is {}, score is {}".format(id, score))
 
 
+                elif(runMode==3):
+                    peopleID = 0
+                    if(len(chkList)>0):
+                        smallist = 999
+                        for id, (ID, score) in enumerate(chkList):
+                            if(score<smallist):
+                                smallist = score
+                                peopleID = str(ID)
 
-            if(openDoor is True):
-                logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
-                callWebServer(str(peopleID), camFace1, camFace2, openDoor)
-                cv2.putText(screen, "Your ID is {}, your are verified!".format(peopleID), (20, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2)
-                cv2.imshow("SunplusIT", screen )
-                cv2.waitKey(1)
-                os.system('/usr/bin/aplay ' + WAV_FOLDER + 'opendoor.wav')
-                #readNumber(str(peopleID))
-                #os.system('/usr/bin/aplay ' + WAV_FOLDER + 'checkin_opendoor.wav')
-            else:
-                logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
-                callWebServer(str(peopleID), camFace1, camFace2, openDoor)
-                cv2.putText(screen, "Sorry, you are not verified!", (80, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2)
-                cv2.imshow("SunplusIT", screen )
-                cv2.waitKey(1)
-                os.system('/usr/bin/aplay ' + WAV_FOLDER + 'sorry_verify_fail.wav')
+                        if(smallist<FACE_MATCH_THRESHOLD_avg):
+                            openDoor = True
 
-            screen = blackScreen()
-            cv2.imshow("SunplusIT", screen )
-            cv2.waitKey(1)
 
-        else:
-            if(runMode == 0):  #add the new user
-                filename = str(time.time()) + ".jpg"
 
-                if(chkID(peopleID) is True):
-                    os.rename(validPicPath+str(peopleID)+"/cam0/valid.jpg", validPicPath+str(peopleID)+"/cam0/"+filename)
-                    os.rename(validPicPath+str(peopleID)+"/cam1/valid.jpg", validPicPath+str(peopleID)+"/cam1/"+filename)
-
-                regID(str(peopleID), faceArea1, faceArea2)
-
-                cv2.imwrite(historyPicPath+str(peopleID)+"/cam0/"+filename, camFace1)
-                cv2.imwrite(historyPicPath+str(peopleID)+"/cam1/"+filename, camFace2)
-                #cv2.imwrite(validPicPath+str(peopleID)+"/cam0/valid.jpg", faceArea1)
-                #cv2.imwrite(validPicPath+str(peopleID)+"/cam1/valid.jpg"+filename, faceArea2)
-                os.system('/usr/bin/aplay ' + WAV_FOLDER + 'photo_saved.wav')
+                if(openDoor is True):
+                    logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
+                    callWebServer(str(peopleID), camFace1, camFace2, openDoor)
+                    cv2.putText(screen, "Your ID is {}, your are verified!".format(peopleID), (20, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2)
+                    cv2.imshow("SunplusIT", screen )
+                    cv2.waitKey(1)
+                    os.system('/usr/bin/aplay ' + WAV_FOLDER + 'opendoor.wav')
+                    #readNumber(str(peopleID))
+                    #os.system('/usr/bin/aplay ' + WAV_FOLDER + 'checkin_opendoor.wav')
+                else:
+                    logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
+                    callWebServer(str(peopleID), camFace1, camFace2, openDoor)
+                    cv2.putText(screen, "Sorry, you are not verified!", (80, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2)
+                    cv2.imshow("SunplusIT", screen )
+                    cv2.waitKey(1)
+                    os.system('/usr/bin/aplay ' + WAV_FOLDER + 'sorry_verify_fail.wav')
 
                 screen = blackScreen()
                 cv2.imshow("SunplusIT", screen )
                 cv2.waitKey(1)
+
+            else:
+                if(runMode == 0):  #add the new user
+                    filename = str(time.time()) + ".jpg"
+
+                    if(chkID(peopleID) is True):
+                        os.rename(validPicPath+str(peopleID)+"/cam0/valid.jpg", validPicPath+str(peopleID)+"/cam0/"+filename)
+                        os.rename(validPicPath+str(peopleID)+"/cam1/valid.jpg", validPicPath+str(peopleID)+"/cam1/"+filename)
+
+                    regID(str(peopleID), faceArea1, faceArea2)
+
+                    cv2.imwrite(historyPicPath+str(peopleID)+"/cam0/"+filename, camFace1)
+                    cv2.imwrite(historyPicPath+str(peopleID)+"/cam1/"+filename, camFace2)
+                    #cv2.imwrite(validPicPath+str(peopleID)+"/cam0/valid.jpg", faceArea1)
+                    #cv2.imwrite(validPicPath+str(peopleID)+"/cam1/valid.jpg"+filename, faceArea2)
+                    os.system('/usr/bin/aplay ' + WAV_FOLDER + 'photo_saved.wav')
+
+                    screen = blackScreen()
+                    cv2.imshow("SunplusIT", screen )
+                    cv2.waitKey(1)
     else:
         cv2.waitKey(1)
