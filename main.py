@@ -20,7 +20,7 @@ import requests
 #from libFacialDoor import mqttFACE
 
 #KeyInID = False
-runMode = 1  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
+runMode = 0  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
 topDIR ="/media/pi/3A72-2DE1/"
 toWebserver = "/var/www/html/door/"
 logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
@@ -43,8 +43,8 @@ validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
 cascade_scale = 1.2
 cascade_neighbors = 6
-minFaceSize = (140,140)  #for cascade
-minFaceSize1 = (180, 180)  #for send to facenet  webcam1
+minFaceSize = (145,145)  #for cascade
+minFaceSize1 = (165, 165)  #for send to facenet  webcam1
 minFaceSize2 = (140, 140)  #for send to facenet webcam2
 dlib_detectorRatio = 1
 
@@ -399,30 +399,12 @@ while True:
 
             openDoor = False
 
-            if(runMode == 0 or runMode == 1 or runMode == 2):
-                #if(len(chkList)>0):
-                #os.system('/usr/bin/aplay ' + WAV_FOLDER + 'inputid.wav')
-                #peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
-                #logging.info("User keyin the employee id:", peopleID)
 
-                if(runMode == 0):  #add the new user
-                    filename = str(time.time()) + ".jpg"
-
-                    if(chkID(peopleID) is True):
-                        os.rename(validPicPath+str(peopleID)+"/cam0/valid.jpg", validPicPath+str(peopleID)+"/cam0/"+filename)
-                        os.rename(validPicPath+str(peopleID)+"/cam1/valid.jpg", validPicPath+str(peopleID)+"/cam1/"+filename)
-
-                    cv2.imwrite(historyPicPath+str(peopleID)+"/cam0/valid.jpg", camFace1)
-                    cv2.imwrite(historyPicPath+str(peopleID)+"/cam1/valid.jpg", camFace2)
-                    cv2.imwrite(validPicPath+str(peopleID)+"/cam0/valid.jpg", faceArea1)
-                    cv2.imwrite(validPicPath+str(peopleID)+"/cam1/valid.jpg"+filename, faceArea2)
-                    os.system('/usr/bin/aplay ' + WAV_FOLDER + 'photo_saved.wav')
-
-                elif(runMode == 1 or runMode == 2): 
-                    for id, score in chkList:
-                        if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
-                            openDoor = True
-                            logging.info("   --->Pass, id is {}, score is {}".format(id, score))
+            if(runMode==1 or runMode==2):
+                for id, score in chkList:
+                    if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
+                        openDoor = True
+                        logging.info("   --->Pass, id is {}, score is {}".format(id, score))
 
 
             elif(runMode==3):
@@ -436,6 +418,7 @@ while True:
 
                     if(smallist<FACE_MATCH_THRESHOLD_avg):
                         openDoor = True
+
 
 
             if(openDoor is True):
@@ -459,13 +442,24 @@ while True:
             cv2.imshow("SunplusIT", screen )
             cv2.waitKey(1)
 
-        screen = blackScreen()
+        else:
+            if(runMode == 0):  #add the new user
+                filename = str(time.time()) + ".jpg"
 
-        #if(screen is not None):
-        cv2.imshow("SunplusIT", screen )
-        cv2.waitKey(1)
+                if(chkID(peopleID) is True):
+                    os.rename(validPicPath+str(peopleID)+"/cam0/valid.jpg", validPicPath+str(peopleID)+"/cam0/"+filename)
+                    os.rename(validPicPath+str(peopleID)+"/cam1/valid.jpg", validPicPath+str(peopleID)+"/cam1/"+filename)
 
-        #print("Wait 10 seconds")
-        #time.sleep(2)
+                regID(str(peopleID), faceArea1, faceArea2)
+
+                cv2.imwrite(historyPicPath+str(peopleID)+"/cam0/"+filename, camFace1)
+                cv2.imwrite(historyPicPath+str(peopleID)+"/cam1/"+filename, camFace2)
+                #cv2.imwrite(validPicPath+str(peopleID)+"/cam0/valid.jpg", faceArea1)
+                #cv2.imwrite(validPicPath+str(peopleID)+"/cam1/valid.jpg"+filename, faceArea2)
+                os.system('/usr/bin/aplay ' + WAV_FOLDER + 'photo_saved.wav')
+
+                screen = blackScreen()
+                cv2.imshow("SunplusIT", screen )
+                cv2.waitKey(1)
     else:
         cv2.waitKey(1)
