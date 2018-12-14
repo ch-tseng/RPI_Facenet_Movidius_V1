@@ -457,25 +457,30 @@ def matchFace(this_ID=None):
     return (pic1,faceArea1), (pic2, faceArea2), idList, idYN, idScore, screen
 
 
-def doorAction(openDoor, peopleID, camFace1, camFace2):
+def doorAction(openDoor, peopleID, camFace1, camFace2, screen):
     if(openDoor is True):
         logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
         callWebServer(str(peopleID), camFace1, camFace2, openDoor)
         cv2.putText(screen, "Your ID is {}, your are verified!".format(peopleID), (20, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2)
+        cv2.imshow("SunplusIT", screen )
+        cv2.waitKey(1)
+        id = str(peopleID)
+        readNumber(id[3:len(id)])
         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'opendoor.wav')
-        #readNumber(str(peopleID))
         #os.system('/usr/bin/aplay ' + WAV_FOLDER + 'checkin_opendoor.wav')
     else:
         logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
         callWebServer(str(peopleID), camFace1, camFace2, openDoor)
         cv2.putText(screen, "Sorry, you are not verified!", (80, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (0,0,255), 2)
+        cv2.imshow("SunplusIT", screen )
+        cv2.waitKey(1)
+        id = str(peopleID)
+        readNumber(id[3:len(id)])
         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'sorry_verify_fail.wav')
 
 
-
-faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
 #------------------------------------------------------------------------
-
+faceCheck = facenetVerify(graphPath=GRAPH_FILENAME, movidiusID=0)
 createEnv()
 
 screen = blackScreen()
@@ -540,10 +545,12 @@ while True:
                         if(smallist<FACE_MATCH_THRESHOLD_avg):
                             openDoor = True
 
-                doorAction(openDoor, peopleID, camFace1, camFace2)
+                doorAction(openDoor, peopleID, camFace1, camFace2, screen)
+
                 screen = blackScreen()
                 cv2.imshow("SunplusIT", screen )
                 cv2.waitKey(1)
+
 
             else:
                 if(runMode == 0):  #add the new user
@@ -566,7 +573,8 @@ while True:
                     cv2.waitKey(1)
 
                 elif(runMode == 2):
-                    doorAction(False, peopleID, camFace1, camFace2)
+                    doorAction(False, peopleID, camFace1, camFace2, screen)
+
                     screen = blackScreen()
                     cv2.imshow("SunplusIT", screen )
                     cv2.waitKey(1)
