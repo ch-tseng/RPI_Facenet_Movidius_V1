@@ -27,16 +27,15 @@ logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
 faceDetect = "cascade"  #dlib / cascade
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 WAV_FOLDER = "/home/pi/works/door_face/wav/"
-FACE_MATCH_THRESHOLD_cam0 = 0.40
-FACE_MATCH_THRESHOLD_cam1 = 0.40
-FACE_MATCH_THRESHOLD_avg = 0.38
+FACE_MATCH_THRESHOLD_cam0 = 0.40  #cam0 的分數要低於多少才算通過辨識
+FACE_MATCH_THRESHOLD_cam1 = 0.40  #cam1 的分數要低於多少才算通過辨識
+FACE_MATCH_THRESHOLD_avg = 0.38  #cam0+cam1 的平均分數要低於多少才算通過辨識
 
-#webcam_size = ( 640,360)
 webcam_size = ( 352,288)
-btnCheckin = 14
+btnCheckin = 14   #開始辨識按鍵的pin腳位
 
-offsetFaceBox = (10,10)
-captureTime = 60  #how long will camera try to capture the face for verify a face
+offsetFaceBox = (10,10)  #拍照時,cam0的中心要在紅框中間多大的距離內
+captureTime = 60  #拍照時間超過幾秒沒有動作,則回到等待狀態
 previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
@@ -44,8 +43,8 @@ face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xm
 cascade_scale = 1.2
 cascade_neighbors = 6
 minFaceSize = (145,145)  #for cascade
-minFaceSize1 = (165, 165)  #for send to facenet  webcam1
-minFaceSize2 = (140, 140)  #for send to facenet webcam2
+minFaceSize1 = (165, 165)  #cam0 臉部area最小不可低於
+minFaceSize2 = (140, 140)  #cam1 臉部area最小不可低於
 dlib_detectorRatio = 1
 
 posturl="http://api.sunplusit.com/api/DoorFaceDetection"
@@ -437,15 +436,19 @@ def matchFace(this_ID=None):
 
     elif(runMode == 2):
         if(chkID(this_ID)==True):
-            valid0 = cv2.imread(validPicPath + this_ID + "/cam0/valid.jpg")
-            valid1 = cv2.imread(validPicPath + this_ID + "/cam1/valid.jpg")
-            passYN1, score1 = faceCheck.face_match(face1=faceArea1, face2=valid0, threshold=FACE_MATCH_THRESHOLD_cam0)
-            passYN2, score2 = faceCheck.face_match(face1=faceArea2, face2=valid1, threshold=FACE_MATCH_THRESHOLD_cam1)
+            for validFile in ("valid.jpg", "valid0.jpg", "valid1.jpg", "valid2.jpg", "valid3.jpg", "valid4.jpg"):
+                cam0File = validPicPath + this_ID + "/cam0/" + validFile
+                cam1File = validPicPath + this_ID + "/cam1/" + validFile
+                if(os.path.exists(cam0File) and os.path.exists(cam1File)):
+                    valid0 = cv2.imread(validPicPath + this_ID + "/cam0/" + validFile)
+                    valid1 = cv2.imread(validPicPath + this_ID + "/cam1/" + validFile)
+                    passYN1, score1 = faceCheck.face_match(face1=faceArea1, face2=valid0, threshold=FACE_MATCH_THRESHOLD_cam0)
+                    passYN2, score2 = faceCheck.face_match(face1=faceArea2, face2=valid1, threshold=FACE_MATCH_THRESHOLD_cam1)
 
-            idList.append(this_ID)
-            idYN.append((passYN1, passYN2))
-            idScore.append((score1, score2))
-            logging.info("ID:{}, PASS1:{}, PASS2:{}, SCORE1:{}, SCORE2:{}".format(this_ID, passYN1, passYN2, score1, score2))
+                    idList.append(this_ID)
+                    idYN.append((passYN1, passYN2))
+                    idScore.append((score1, score2))
+                    logging.info("ID:{}, FILE:{}, PASS1:{}, PASS2:{}, SCORE1:{}, SCORE2:{}".format(this_ID, validFile, passYN1, passYN2, score1, score2))
         else:
             idList = idYN = idScore = None
 
