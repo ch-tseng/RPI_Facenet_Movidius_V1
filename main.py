@@ -33,6 +33,7 @@ FACE_MATCH_THRESHOLD_avg = 0.38  #cam0+cam1 的平均分數要低於多少才算
 
 webcam_size = ( 352,288)
 btnCheckin = 14   #開始辨識按鍵的pin腳位
+adm_users = [200334, 200345, 200096, 200099, 200100, 200159, 200280]
 
 offsetFaceBox = (10,10)  #拍照時,cam0的中心要在紅框中間多大的距離內
 captureTime = 60  #拍照時間超過幾秒沒有動作,則回到等待狀態
@@ -461,6 +462,8 @@ def matchFace(this_ID=None):
 
 
 def doorAction(openDoor, peopleID, camFace1, camFace2, screen):
+    global runMode
+
     if(openDoor is True):
         logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
         callWebServer(str(peopleID), camFace1, camFace2, openDoor)
@@ -470,7 +473,17 @@ def doorAction(openDoor, peopleID, camFace1, camFace2, screen):
         id = str(peopleID)
         readNumber(id[3:len(id)])
         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'opendoor.wav')
-        #os.system('/usr/bin/aplay ' + WAV_FOLDER + 'checkin_opendoor.wav')
+
+        for adm in adm_users:
+            if(str(peopleID) == str(adm)):
+                startTime = time.time()
+                while time.time() - startTime < 10:
+                    if(GPIO.input(btnCheckin)==0):
+                        logging.info("ID {} enter the adm mode.".format(peopleID))
+                        runMode = 0
+                        os.system('/usr/bin/aplay ' + WAV_FOLDER + 'adm_mode.wav')
+                        break
+
     else:
         logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
         callWebServer(str(peopleID), camFace1, camFace2, openDoor)
@@ -480,6 +493,8 @@ def doorAction(openDoor, peopleID, camFace1, camFace2, screen):
         id = str(peopleID)
         readNumber(id[3:len(id)])
         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'sorry_verify_fail.wav')
+
+
 
 
 #------------------------------------------------------------------------
@@ -560,8 +575,8 @@ while True:
                     filename = str(time.time()) + ".jpg"
 
                     if(chkID(peopleID) is True):
-                        os.rename(validPicPath+str(peopleID)+"/cam0/valid.jpg", validPicPath+str(peopleID)+"/cam0/"+filename)
-                        os.rename(validPicPath+str(peopleID)+"/cam1/valid.jpg", validPicPath+str(peopleID)+"/cam1/"+filename)
+                        os.rename(validPicPath+str(peopleID)+"/cam0/valid.jpg", validPicPath+str(peopleID)+"/cam0/valid_"+filename)
+                        os.rename(validPicPath+str(peopleID)+"/cam1/valid.jpg", validPicPath+str(peopleID)+"/cam1/valid_"+filename)
 
                     regID(str(peopleID), faceArea1, faceArea2)
 
@@ -570,6 +585,16 @@ while True:
                     #cv2.imwrite(validPicPath+str(peopleID)+"/cam0/valid.jpg", faceArea1)
                     #cv2.imwrite(validPicPath+str(peopleID)+"/cam1/valid.jpg"+filename, faceArea2)
                     os.system('/usr/bin/aplay ' + WAV_FOLDER + 'photo_saved.wav')
+
+                    for adm in adm_users:
+                        if(peopleID == adm):
+                            startTime = time.time()
+                            while time.time() - startTime < 10:
+                                if(GPIO.input(btnCheckin)==0):
+                                    runMode = 2
+                                    logging.info("ID {} exit from the adm mode.".format(peopleID))
+                                    os.system('/usr/bin/aplay ' + WAV_FOLDER + 'punch_mode.wav')
+                                    break
 
                     screen = blackScreen()
                     cv2.imshow("SunplusIT", screen )
