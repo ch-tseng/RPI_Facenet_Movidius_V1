@@ -317,7 +317,7 @@ def matchFace(this_ID=None):
 
     if(camOK is not True):
         logging.critical("web camera is not working!")
-        return None, None, None
+        return (None, None), (None, None), None, None, None, None
 
     totalCount1 = 0
     totalCount2 = 0
@@ -585,7 +585,7 @@ while True:
 
 
                 else:
-                    if(runMode == 0):  #add the new user
+                    if(runMode == 0 and camFace1 is not None):  #add the new user
                         filename = str(time.time()) + ".jpg"
 
                         if(chkID(peopleID) is True):
@@ -614,9 +614,14 @@ while True:
                         cv2.imshow("SunplusIT", screen )
                         cv2.waitKey(1)
 
-                    elif(runMode == 2):
+                    elif(runMode == 2 and camFace1 is not None):
                         doorAction(False, peopleID, camFace1, camFace2, screen)
 
+                        screen = blackScreen()
+                        cv2.imshow("SunplusIT", screen )
+                        cv2.waitKey(1)
+
+                    else:
                         screen = blackScreen()
                         cv2.imshow("SunplusIT", screen )
                         cv2.waitKey(1)
