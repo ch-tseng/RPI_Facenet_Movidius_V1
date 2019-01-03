@@ -21,7 +21,7 @@ import requests
 
 #KeyInID = False
 onlyWorkDay = True
-notWorkDay = [ "1/1", "2/4", "2/5", "2/6", "2/7", "2/8", "2/28", "3/1", "4/4", "4/5", "5/1", "6/7", "9/13", "10/10", "10/11" ]
+notWorkDay = [ "2/4", "2/5", "2/6", "2/7", "2/8", "2/28", "3/1", "4/4", "4/5", "5/1", "6/7", "9/13", "10/10", "10/11" ]
 runMode = 2  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
 topDIR ="/media/pi/3A72-2DE1/"
 toWebserver = "/var/www/html/door/"
@@ -29,31 +29,33 @@ logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
 faceDetect = "cascade"  #dlib / cascade
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 WAV_FOLDER = "/home/pi/works/door_face/wav/"
-FACE_MATCH_THRESHOLD_cam0 = 0.40  #cam0 的分數要低於多少才算通過辨識
-FACE_MATCH_THRESHOLD_cam1 = 0.40  #cam1 的分數要低於多少才算通過辨識
-FACE_MATCH_THRESHOLD_avg = 0.38  #cam0+cam1 的平均分數要低於多少才算通過辨識
+FACE_MATCH_THRESHOLD_cam0 = 0.25  #cam0 的分數要低於多少才算通過辨識
+FACE_MATCH_THRESHOLD_cam1 = 0.25  #cam1 的分數要低於多少才算通過辨識
+FACE_MATCH_THRESHOLD_avg = 0.25  #cam0+cam1 的平均分數要低於多少才算通過辨識
 
 webcam_size = ( 352,288)
-btnCheckin = 14   #開始辨識按鍵的pin腳位
+cam1_rotate = 0
+cam2_rotate = 0
+btnCheckin = 15   #開始辨識按鍵的pin腳位
 adm_users = [200334, 200345, 200096, 200099, 200100, 200159, 200280]
 
-offsetFaceBox = (10,10)  #拍照時,cam0的中心要在紅框中間多大的距離內
+offsetFaceBox = (15,15)  #拍照時,cam0的中心要在紅框中間多大的距離內
 captureTime = 60  #拍照時間超過幾秒沒有動作,則回到等待狀態
 previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
-cascade_scale = 1.2
-cascade_neighbors = 6
-minFaceSize = (145,145)  #for cascade
-minFaceSize1 = (165, 165)  #cam0 臉部area最小不可低於
-minFaceSize2 = (140, 140)  #cam1 臉部area最小不可低於
+cascade_scale = 1.10
+cascade_neighbors = 5
+minFaceSize = (120,120)  #for cascade
+minFaceSize1 = (120, 120)  #cam0 臉部area最小不可低於
+minFaceSize2 = (120, 120)  #cam1 臉部area最小不可低於
 dlib_detectorRatio = 1
 
 posturl="http://api.sunplusit.com/api/DoorFaceDetection"
 GPIO.setup(btnCheckin, GPIO.IN)
-cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
-cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+#cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
+#cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 blankScreen = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
 seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
@@ -61,13 +63,17 @@ seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
 
 def chkWorkDay():
     today = datetime.datetime.today()
+    now = datetime.datetime.now()
     month = today.month
     day = today.day
     weekDay = today.weekday() + 1
     if( weekDay==6 or weekDay==7) or (str(month)+"/"+str(day) in notWorkDay):
         return False
     else:
-        return True
+        if(now.hour<20 and now.hour>=6):
+            return True
+        else:
+            return False
 
 def mouseClick(event,x,y,flags,param):
     global ix, iy
@@ -353,16 +359,16 @@ def matchFace(this_ID=None):
 
         faceCam1 = False
         faceCam2 = False
-        okPic1, pic1 = cam1.takepic(rotate=0, vflip=False, hflip=True, resize=None, savePath=None)
-        print("pic1:", pic1.shape)
+        okPic1, pic1 = cam1.takepic(rotate=cam1_rotate, vflip=False, hflip=True, resize=None, savePath=None)
+        #print("pic1:", pic1.shape)
         if(okPic1 is not True):
             logging.error("Taking a picture by cam1 is failed!")
         else:
             tmpPic1 = pic1.copy()
             leftFaceBox = (int(webcam_size[0]/2)-int(minFaceSize[0]/2), int(webcam_size[1]/2)-int(minFaceSize[1]/2))
             rightFaceBox = (int(webcam_size[0]/2)+int(minFaceSize[0]/2), int(webcam_size[1]/2)+int(minFaceSize[1]/2))
-            print("leftFaceBox:{}, rightFaceBox:{}".format(leftFaceBox, rightFaceBox))
-            cv2.rectangle( tmpPic1,leftFaceBox, rightFaceBox ,(0,0,255),2)
+            #print("leftFaceBox:{}, rightFaceBox:{}".format(leftFaceBox, rightFaceBox))
+            #cv2.rectangle( tmpPic1,leftFaceBox, rightFaceBox ,(0,0,255),2)
             cv2.putText(tmpPic1, "webcam:0", (int(webcam_size[0]/2)-50, 20), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255,255,0), 1)
 
             if(faceDetect=='dlib'):
@@ -379,17 +385,17 @@ def matchFace(this_ID=None):
                     centerX = bbox1[0][0] +  bbox1[0][2]/2
                     centerY = bbox1[0][1] +  bbox1[0][3]/2
 
-                    if((centerX<imgCenterX+offsetFaceBox[0] and centerX>imgCenterX-offsetFaceBox[0]) and (centerY<imgCenterY+offsetFaceBox[1] or centerY>imgCenterY-offsetFaceBox[1])):
-                        faceCam1 = True
-                        faceArea1 = pic1[bbox1[0][1]:bbox1[0][1]+bbox1[0][3],bbox1[0][0]:bbox1[0][0]+bbox1[0][2]]
-                        cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + "-face.jpg", faceArea1)
-                        cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
-                        logging.debug("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
-                        for (x,y,w,h) in bbox1:
-                            cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
+                    #if((centerX<imgCenterX+offsetFaceBox[0] and centerX>imgCenterX-offsetFaceBox[0]) and (centerY<imgCenterY+offsetFaceBox[1] or centerY>imgCenterY-offsetFaceBox[1])):
+                    faceCam1 = True
+                    faceArea1 = pic1[bbox1[0][1]:bbox1[0][1]+bbox1[0][3],bbox1[0][0]:bbox1[0][0]+bbox1[0][2]]
+                    cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + "-face.jpg", faceArea1)
+                    cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
+                    logging.debug("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
+                    for (x,y,w,h) in bbox1:
+                        cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
 
-        okPic2, pic2 = cam2.takepic(rotate=180, vflip=False, hflip=True, resize=None, savePath=None)
-        print("pic2:", pic2.shape)
+        okPic2, pic2 = cam2.takepic(rotate=cam2_rotate, vflip=False, hflip=True, resize=None, savePath=None)
+        #print("pic2:", pic2.shape)
         if(okPic2 is not True):
             logging.error("Taking a picture by cam2 is failed!")
         else:
@@ -420,8 +426,8 @@ def matchFace(this_ID=None):
         #tmpPic1 = imutils.resize(tmpPic1, height=280)
         #tmpPic2 = imutils.resize(tmpPic2, height=280)
         #seperateBLock = imutils.resize(seperateBLock, height=280)
-        print("tmpPic1:{}, seperateBLock:{}, tmpPic2:{}".format(tmpPic1.shape,seperateBLock.shape,tmpPic2.shape))
-        cameraArea = imutils.resize(np.hstack((tmpPic1, seperateBLock, tmpPic2)), width=800)
+        #print("tmpPic1:{}, seperateBLock:{}, tmpPic2:{}".format(tmpPic1.shape,seperateBLock.shape,tmpPic2.shape))
+        cameraArea = imutils.resize(np.hstack((tmpPic2, seperateBLock, tmpPic1)), width=800)
         screen = displayScreen(cameraArea, (0,95))
 
 
@@ -519,8 +525,8 @@ cv2.waitKey(1)
 
 while True:
     clickCheckin = GPIO.input(btnCheckin)
+    print("Click", clickCheckin)
     idList = None
-    #print(clickCheckin)
     if(clickCheckin == 0):
         if(chkWorkDay() == True):
 
@@ -531,7 +537,7 @@ while True:
                 os.system('/usr/bin/aplay ' + WAV_FOLDER + 'inputid.wav')
                 #peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
                 peopleID = keyinID()
-                print(peopleID)
+                #print(peopleID)
                 logging.info("User keyin the employee id:", peopleID)
 
             else:
@@ -600,10 +606,11 @@ while True:
                         #cv2.imwrite(validPicPath+str(peopleID)+"/cam1/valid.jpg"+filename, faceArea2)
                         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'photo_saved.wav')
 
+                        
                         for adm in adm_users:
                             if(peopleID == adm):
                                 startTime = time.time()
-                                while time.time() - startTime < 10:
+                                while time.time() - startTime < 5:
                                     if(GPIO.input(btnCheckin)==0):
                                         runMode = 2
                                         logging.info("ID {} exit from the adm mode.".format(peopleID))
