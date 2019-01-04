@@ -62,7 +62,7 @@ cascade_scale = 1.1
 cascade_neighbors = 4
 minFaceSize = (90,90)  #for cascade
 minFaceSize1 = (90, 90)  #cam0 臉部area最小不可低於
-minFaceSize2 = (90, 90)  #cam1 臉部area最小不可低於
+minFaceSize2 = (60, 60)  #cam1 臉部area最小不可低於
 dlib_detectorRatio = 0
 
 posturl="http://api.sunplusit.com/api/DoorFaceDetection"
@@ -454,9 +454,9 @@ def matchFace(this_ID=None):
             if(faceDetect=='dlib'):
                 bbox2 = getFaces_dlib(pic2)
             elif(faceDetect=='mtcnn'):
-                bbox1 = getFaces_mtcnn(pic2)
+                bbox2 = getFaces_mtcnn(pic2)
             elif(faceDetect=='mtcnn2'):
-                bbox1 = getFaces_mtcnn2(pic2)
+                bbox2 = getFaces_mtcnn2(pic2)
             else:
                 bbox2 = getFaces_cascade(pic2)
 
