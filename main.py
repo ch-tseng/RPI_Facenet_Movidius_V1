@@ -6,7 +6,19 @@ GPIO.setmode(GPIO.BCM)
 
 import logging
 from mvnc import mvncapi as mvnc
-#import dlib
+
+faceDetect = "mtcnn2"  #dlib / cascade / mtcnn / mtcnn2
+
+if(faceDetect=="dlib"):
+    import dlib
+    detector = dlib.get_frontal_face_detector()
+elif(faceDetect=="mtcnn"):
+    from mtcnn.mtcnn import MTCNN
+    detector = MTCNN()
+elif(faceDetect=="mtcnn2"):
+    from libMTCNN import faceMTCNN
+    detector = faceMTCNN()
+
 import numpy as np
 import cv2
 import imutils
@@ -26,14 +38,15 @@ runMode = 2  # 0--> enter ID, and add this employee  1--> enter ID and scan all 
 topDIR ="/media/pi/3A72-2DE1/"
 toWebserver = "/var/www/html/door/"
 logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
-faceDetect = "cascade"  #dlib / cascade
+#faceDetect = "cascade"  #dlib / cascade / mtcnn
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 WAV_FOLDER = "/home/pi/works/door_face/wav/"
 FACE_MATCH_THRESHOLD_cam0 = 0.25  #cam0 的分數要低於多少才算通過辨識
 FACE_MATCH_THRESHOLD_cam1 = 0.25  #cam1 的分數要低於多少才算通過辨識
 FACE_MATCH_THRESHOLD_avg = 0.25  #cam0+cam1 的平均分數要低於多少才算通過辨識
 
-webcam_size = ( 352,288)
+#webcam_size = ( 352,288)
+webcam_size = ( 640,480)
 cam1_rotate = 0
 cam2_rotate = 0
 btnCheckin = 15   #開始辨識按鍵的pin腳位
@@ -45,17 +58,17 @@ previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
-cascade_scale = 1.10
-cascade_neighbors = 5
-minFaceSize = (120,120)  #for cascade
-minFaceSize1 = (120, 120)  #cam0 臉部area最小不可低於
-minFaceSize2 = (120, 120)  #cam1 臉部area最小不可低於
-dlib_detectorRatio = 1
+cascade_scale = 1.1
+cascade_neighbors = 4
+minFaceSize = (90,90)  #for cascade
+minFaceSize1 = (90, 90)  #cam0 臉部area最小不可低於
+minFaceSize2 = (90, 90)  #cam1 臉部area最小不可低於
+dlib_detectorRatio = 0
 
 posturl="http://api.sunplusit.com/api/DoorFaceDetection"
 GPIO.setup(btnCheckin, GPIO.IN)
-#cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
-#cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
+cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 blankScreen = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
 seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
@@ -211,7 +224,7 @@ def regID(id, pic1, pic2):
     logging.info(id+" path registered:", userPath)
 
 def getFaces_dlib(img):
-    detector = dlib.get_frontal_face_detector()
+    #detector = dlib.get_frontal_face_detector()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     rects = detector( gray , dlib_detectorRatio)
     bboxes = []
@@ -221,6 +234,34 @@ def getFaces_dlib(img):
             bboxes.append((x,y,w,h))
 
     return bboxes
+
+def getFaces_mtcnn(img):
+    faces = detector.detect_faces(img)
+    bboxes = []
+    for face in faces:
+        x = face["box"][0]
+        y = face["box"][1]
+        w = face["box"][2]
+        h = face["box"][3]
+        if(w>minFaceSize[0] and h>minFaceSize[1]):
+            bboxes.append((x,y,w,h))
+
+    return bboxes
+
+def getFaces_mtcnn2(img):
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    faces = detector.detect_face(img, minFaceSize[0])
+    bboxes = []
+    for face in faces:
+        x = face[0]
+        y = face[1]
+        w = face[2]
+        h = face[3]
+        if(w>minFaceSize[0] and h>minFaceSize[1]):
+            bboxes.append((x,y,w,h))
+
+    return bboxes
+
 
 def getFaces_cascade(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -373,6 +414,10 @@ def matchFace(this_ID=None):
 
             if(faceDetect=='dlib'):
                 bbox1 = getFaces_dlib(pic1)
+            elif(faceDetect=='mtcnn'):
+                bbox1 = getFaces_mtcnn(pic1)
+            elif(faceDetect=='mtcnn2'):
+                bbox1 = getFaces_mtcnn2(pic1)
             else:
                 bbox1 = getFaces_cascade(pic1)
 
@@ -408,6 +453,10 @@ def matchFace(this_ID=None):
             
             if(faceDetect=='dlib'):
                 bbox2 = getFaces_dlib(pic2)
+            elif(faceDetect=='mtcnn'):
+                bbox1 = getFaces_mtcnn(pic2)
+            elif(faceDetect=='mtcnn2'):
+                bbox1 = getFaces_mtcnn2(pic2)
             else:
                 bbox2 = getFaces_cascade(pic2)
 
