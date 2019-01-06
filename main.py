@@ -7,7 +7,7 @@ GPIO.setmode(GPIO.BCM)
 import logging
 from mvnc import mvncapi as mvnc
 
-faceDetect = "mtcnn2"  #dlib / cascade / mtcnn / mtcnn2
+faceDetect = "cascade"  #dlib / cascade / mtcnn / mtcnn2
 
 if(faceDetect=="dlib"):
     import dlib
@@ -50,23 +50,26 @@ webcam_size = ( 640,480)
 cam1_rotate = 0
 cam2_rotate = 0
 btnCheckin = 15   #開始辨識按鍵的pin腳位
+pinLight = 18  #LED燈pin
 adm_users = [200334, 200345, 200096, 200099, 200100, 200159, 200280]
 
-offsetFaceBox = (15,15)  #拍照時,cam0的中心要在紅框中間多大的距離內
+offsetFaceBox = (30,30)  #拍照時,cam0的中心要在紅框中間多大的距離內
 captureTime = 60  #拍照時間超過幾秒沒有動作,則回到等待狀態
 previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
-cascade_scale = 1.1
-cascade_neighbors = 4
-minFaceSize = (90,90)  #for cascade
-minFaceSize1 = (90, 90)  #cam0 臉部area最小不可低於
-minFaceSize2 = (60, 60)  #cam1 臉部area最小不可低於
+cascade_scale = 1.2
+cascade_neighbors = 6
+minFaceSize = (30,30)  #for cascade
+minFaceSize1 = (30, 30)  #cam0 臉部area最小不可低於
+minFaceSize2 = (30, 30)  #cam1 臉部area最小不可低於
 dlib_detectorRatio = 0
 
 posturl="http://api.sunplusit.com/api/DoorFaceDetection"
 GPIO.setup(btnCheckin, GPIO.IN)
+GPIO.setup(pinLight, GPIO.OUT)
+GPIO.output(pinLight,GPIO.LOW)
 cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
 cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
@@ -80,6 +83,9 @@ def chkWorkDay():
     month = today.month
     day = today.day
     weekDay = today.weekday() + 1
+
+    return True
+    '''
     if( weekDay==6 or weekDay==7) or (str(month)+"/"+str(day) in notWorkDay):
         return False
     else:
@@ -87,6 +93,7 @@ def chkWorkDay():
             return True
         else:
             return False
+    '''
 
 def mouseClick(event,x,y,flags,param):
     global ix, iy
@@ -250,7 +257,8 @@ def getFaces_mtcnn(img):
 
 def getFaces_mtcnn2(img):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    faces = detector.detect_face(img, minFaceSize[0])
+    faces = detector.detect_face(img, minFaceSize[0], threshold = [0.305, 0.4473, 0.4473], scale_factor=2)
+    #faces = detector.detect_face(img, minFaceSize[0])
     bboxes = []
     for face in faces:
         x = face[0]
@@ -347,6 +355,8 @@ def callWebServer(id, pic1, pic2, result):
     logging.info(r)
 
 def matchFace(this_ID=None):
+    GPIO.output(pinLight,GPIO.HIGH)
+
     logging.info("Mach face for ID:{}".format(this_ID))
     tmpPic1 = blankScreen.copy()
     tmpPic2 = blankScreen.copy()
@@ -437,7 +447,7 @@ def matchFace(this_ID=None):
                     cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
                     logging.debug("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
                     for (x,y,w,h) in bbox1:
-                        cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),2)
+                        cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),3)
 
         okPic2, pic2 = cam2.takepic(rotate=cam2_rotate, vflip=False, hflip=True, resize=None, savePath=None)
         #print("pic2:", pic2.shape)
@@ -469,7 +479,7 @@ def matchFace(this_ID=None):
                         cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + ".jpg", pic2 )
                         logging.debug("write to:", historyPicPath + "cam1/" + str(time.time()) + ".jpg")
                     for (x,y,w,h) in bbox2:
-                        cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),2)
+                        cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),3)
             
         #print(tmpPic1.shape, seperateBLock.shape, tmpPic2.shape)
         #tmpPic1 = imutils.resize(tmpPic1, height=280)
@@ -546,6 +556,7 @@ def doorAction(openDoor, peopleID, camFace1, camFace2, screen):
                 startTime = time.time()
                 while time.time() - startTime < 10:
                     if(GPIO.input(btnCheckin)==0):
+                        #GPIO.output(pinLight,GPIO.HIGH)
                         logging.info("ID {} enter the adm mode.".format(peopleID))
                         runMode = 0
                         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'adm_mode.wav')
@@ -595,6 +606,7 @@ while True:
             if((peopleID == 0 and runMode==3) or (peopleID !=0 and runMode!=3)):
                 #if(chkID(peopleID) == True
                 (camFace1, faceArea1), (camFace2, faceArea2), idList, idYN, idScore, screen = matchFace(this_ID=str(peopleID))
+                GPIO.output(pinLight,GPIO.LOW)
 
                 if(idList is not None):
                     chkList = []
