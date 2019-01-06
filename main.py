@@ -31,8 +31,8 @@ from libFacialDoor import facenetVerify
 import requests
 #from libFacialDoor import mqttFACE
 
-#KeyInID = False
-onlyWorkDay = True
+Need_KeyInID = False
+onlyWorkDay = False
 notWorkDay = [ "2/4", "2/5", "2/6", "2/7", "2/8", "2/28", "3/1", "4/4", "4/5", "5/1", "6/7", "9/13", "10/10", "10/11" ]
 runMode = 2  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
 topDIR ="/media/pi/3A72-2DE1/"
@@ -43,7 +43,7 @@ GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 WAV_FOLDER = "/home/pi/works/door_face/wav/"
 FACE_MATCH_THRESHOLD_cam0 = 0.25  #cam0 的分數要低於多少才算通過辨識
 FACE_MATCH_THRESHOLD_cam1 = 0.25  #cam1 的分數要低於多少才算通過辨識
-FACE_MATCH_THRESHOLD_avg = 0.25  #cam0+cam1 的平均分數要低於多少才算通過辨識
+FACE_MATCH_THRESHOLD_avg = 0.25 #cam0+cam1 的平均分數要低於多少才算通過辨識
 
 #webcam_size = ( 352,288)
 webcam_size = ( 640,480)
@@ -51,7 +51,7 @@ cam1_rotate = 0
 cam2_rotate = 0
 btnCheckin = 15   #開始辨識按鍵的pin腳位
 pinLight = 18  #LED燈pin
-adm_users = [200334, 200345, 200096, 200099, 200100, 200159, 200280]
+adm_users = [200999]
 
 offsetFaceBox = (30,30)  #拍照時,cam0的中心要在紅框中間多大的距離內
 captureTime = 60  #拍照時間超過幾秒沒有動作,則回到等待狀態
@@ -59,11 +59,11 @@ previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
-cascade_scale = 1.2
-cascade_neighbors = 6
-minFaceSize = (30,30)  #for cascade
-minFaceSize1 = (30, 30)  #cam0 臉部area最小不可低於
-minFaceSize2 = (30, 30)  #cam1 臉部area最小不可低於
+cascade_scale = 1.1
+cascade_neighbors = 8
+minFaceSize = (90,90)  #for cascade
+minFaceSize1 = (90, 90)  #cam0 臉部area最小不可低於
+minFaceSize2 = (90, 90)  #cam1 臉部area最小不可低於
 dlib_detectorRatio = 0
 
 posturl="http://api.sunplusit.com/api/DoorFaceDetection"
@@ -78,22 +78,22 @@ seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
 #-----------------------------------------------------------------------
 
 def chkWorkDay():
-    today = datetime.datetime.today()
-    now = datetime.datetime.now()
-    month = today.month
-    day = today.day
-    weekDay = today.weekday() + 1
+    if(onlyWorkDay == True):
+        today = datetime.datetime.today()
+        now = datetime.datetime.now()
+        month = today.month
+        day = today.day
+        weekDay = today.weekday() + 1
 
-    return True
-    '''
-    if( weekDay==6 or weekDay==7) or (str(month)+"/"+str(day) in notWorkDay):
-        return False
-    else:
-        if(now.hour<20 and now.hour>=6):
-            return True
-        else:
+        if( weekDay==6 or weekDay==7) or (str(month)+"/"+str(day) in notWorkDay):
             return False
-    '''
+        else:
+            if(now.hour<20 and now.hour>=6):
+                return True
+            else:
+                return False
+    else:
+        return True
 
 def mouseClick(event,x,y,flags,param):
     global ix, iy
@@ -548,7 +548,7 @@ def doorAction(openDoor, peopleID, camFace1, camFace2, screen):
         cv2.imshow("SunplusIT", screen )
         cv2.waitKey(1)
         id = str(peopleID)
-        readNumber(id[3:len(id)])
+        #readNumber(id[3:len(id)])
         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'opendoor.wav')
 
         for adm in adm_users:
@@ -671,7 +671,7 @@ while True:
                         for adm in adm_users:
                             if(peopleID == adm):
                                 startTime = time.time()
-                                while time.time() - startTime < 5:
+                                while time.time() - startTime < 10:
                                     if(GPIO.input(btnCheckin)==0):
                                         runMode = 2
                                         logging.info("ID {} exit from the adm mode.".format(peopleID))
