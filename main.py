@@ -32,18 +32,17 @@ import requests
 #from libFacialDoor import mqttFACE
 
 Need_KeyInID = False
-onlyWorkDay = False
+onlyWorkDay = True
 notWorkDay = [ "2/4", "2/5", "2/6", "2/7", "2/8", "2/28", "3/1", "4/4", "4/5", "5/1", "6/7", "9/13", "10/10", "10/11" ]
 runMode = 2  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
 topDIR ="/media/pi/3A72-2DE1/"
 toWebserver = "/var/www/html/door/"
 logging.basicConfig(level=logging.INFO, filename=topDIR+'logging.txt')
-#faceDetect = "cascade"  #dlib / cascade / mtcnn
 GRAPH_FILENAME = "facenet_celeb_ncs.graph"
 WAV_FOLDER = "/home/pi/works/door_face/wav/"
-FACE_MATCH_THRESHOLD_cam0 = 0.25  #cam0 的分數要低於多少才算通過辨識
-FACE_MATCH_THRESHOLD_cam1 = 0.25  #cam1 的分數要低於多少才算通過辨識
-FACE_MATCH_THRESHOLD_avg = 0.25 #cam0+cam1 的平均分數要低於多少才算通過辨識
+FACE_MATCH_THRESHOLD_cam0 = 0.35  #cam0 的分數要低於多少才算通過辨識
+FACE_MATCH_THRESHOLD_cam1 = 0.35  #cam1 的分數要低於多少才算通過辨識
+FACE_MATCH_THRESHOLD_avg = 0.35 #cam0+cam1 的平均分數要低於多少才算通過辨識
 
 #webcam_size = ( 352,288)
 webcam_size = ( 640,480)
@@ -53,16 +52,17 @@ btnCheckin = 15   #開始辨識按鍵的pin腳位
 pinLight = 18  #LED燈pin
 adm_users = [200999]
 
-offsetFaceBox = (30,30)  #拍照時,cam0的中心要在紅框中間多大的距離內
+wait_to_detectFace = 6  #等待幾秒再開始detect face, 免得還沒準備好就拍了
+offsetFaceBox = (10,10)  #拍照時,cam0的中心要在紅框中間多大的距離內
 captureTime = 60  #拍照時間超過幾秒沒有動作,則回到等待狀態
 previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
 cascade_scale = 1.1
-cascade_neighbors = 8
-minFaceSize = (90,90)  #for cascade
-minFaceSize1 = (90, 90)  #cam0 臉部area最小不可低於
+cascade_neighbors = 10
+minFaceSize = (120,120)  #for cascade
+minFaceSize1 = (120, 120)  #cam0 臉部area最小不可低於
 minFaceSize2 = (90, 90)  #cam1 臉部area最小不可低於
 dlib_detectorRatio = 0
 
@@ -307,6 +307,9 @@ def displayScreen(img=None, overlay=None):
         x_offset = overlay[0]
         board[y_offset:y_offset+img.shape[0], x_offset:x_offset+img.shape[1]] = img
 
+    if(runMode==0):
+        cv2.putText(board, "Management mode", (50, 50), cv2.FONT_HERSHEY_COMPLEX, 2, (0,0,255), 2)
+
     return board
     #cv2.imshow("SunplusIT", board )
     #cv2.waitKey(1)
@@ -441,13 +444,14 @@ def matchFace(this_ID=None):
                     centerY = bbox1[0][1] +  bbox1[0][3]/2
 
                     #if((centerX<imgCenterX+offsetFaceBox[0] and centerX>imgCenterX-offsetFaceBox[0]) and (centerY<imgCenterY+offsetFaceBox[1] or centerY>imgCenterY-offsetFaceBox[1])):
-                    faceCam1 = True
-                    faceArea1 = pic1[bbox1[0][1]:bbox1[0][1]+bbox1[0][3],bbox1[0][0]:bbox1[0][0]+bbox1[0][2]]
-                    cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + "-face.jpg", faceArea1)
-                    cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
-                    logging.debug("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
-                    for (x,y,w,h) in bbox1:
-                        cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),3)
+                    if (time.time()-captureStart) > wait_to_detectFace:
+                        faceCam1 = True
+                        faceArea1 = pic1[bbox1[0][1]:bbox1[0][1]+bbox1[0][3],bbox1[0][0]:bbox1[0][0]+bbox1[0][2]]
+                        cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + "-face.jpg", faceArea1)
+                        cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
+                        logging.debug("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
+                        for (x,y,w,h) in bbox1:
+                            cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),3)
 
         okPic2, pic2 = cam2.takepic(rotate=cam2_rotate, vflip=False, hflip=True, resize=None, savePath=None)
         #print("pic2:", pic2.shape)
@@ -492,6 +496,10 @@ def matchFace(this_ID=None):
 
         cv2.imshow("SunplusIT", screen)
         cv2.waitKey(1)
+
+        cv2.imshow("SunplusIT", screen)
+        cv2.waitKey(1)
+
     #----------------------
     #Play start to recognize....
     os.system('/usr/bin/aplay ' + WAV_FOLDER + 'recognize.wav')
