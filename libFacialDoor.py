@@ -105,6 +105,41 @@ class facenetVerify:
 
         return output
 
+    def load_dataset(self, dsPath):
+        hf = h5py.File(dataset_file, 'r')
+        valid_uids = hf.get('uids')
+        valid_embs = hf.get('embs')
+
+        print("HF file loaded, valid names:", valid_uids)
+        return (valid_uids, valid_embs)
+
+
+    def make_dataset(self, facesPath, outputPath="dataset_embs", camlist=["cam0", "cam1"]):
+        #dataset format: 1 camera 1 h5 file, so we have cam0 and cam1 ,2 h5 files
+
+        valid_uid = []
+        valid_embs = []
+        for CAM in camlist:
+            hf = h5py.File(outputPath+"_"+CAM, 'w')
+            for UID in os.listdir(facesPath):  # User id list
+                for PHOTO in os.listdir(facesPath + "/" + UID + "/" + CAM):  #photo list
+                    folder = facesPath + "/" + UID + "/" + CAM
+                    print("Processing ", folder + "/" + PHOTO)
+                    filename, file_extension = os.path.splitext(PHOTO)
+                    file_extension = file_extension.lower()
+                    if(file_extension == ".jpg" or file_extension==".jpeg" or file_extension==".png" or file_extension==".bmp"):
+                        face = cv2.imread(folder + "/" + PHOTO)
+                        embs_face = self.__run_inference(face, self.graph)
+                        valid_uid.append(UID.encode())
+                        valid_embs.append(embs_face)
+
+        if(len(valid_embs)>0 and len(valid_uid)>0):
+            hf.create_dataset("uids", data=np.array(valid_uid))
+            hf.create_dataset("embs", data=np.array(valid_embs))
+            hf.close()
+
+        print("EMBS DATASET created.")
+
     def face_match(self, face1, face2, threshold):
         face1_output = self.__run_inference(face1, self.graph)
         face2_output = self.__run_inference(face2, self.graph)
