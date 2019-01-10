@@ -55,27 +55,31 @@ adm_users = [200999]
 wait_to_detectFace = 6  #等待幾秒再開始detect face, 免得還沒準備好就拍了
 offsetFaceBox = (10,10)  #拍照時,cam0的中心要在紅框中間多大的距離內
 captureTime = 60  #拍照時間超過幾秒沒有動作,則回到等待狀態
+blurRate = 120  # higher is more clear, lower is more blurly
 previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
 cascade_scale = 1.1
-cascade_neighbors = 10
+cascade_neighbors = 8
 minFaceSize = (120,120)  #for cascade
 minFaceSize1 = (120, 120)  #cam0 臉部area最小不可低於
 minFaceSize2 = (90, 90)  #cam1 臉部area最小不可低於
 dlib_detectorRatio = 0
+#screen_saver_time = 300
 
 posturl="http://api.sunplusit.com/api/DoorFaceDetection"
 GPIO.setup(btnCheckin, GPIO.IN)
 GPIO.setup(pinLight, GPIO.OUT)
 GPIO.output(pinLight,GPIO.LOW)
+
 cv2.namedWindow("SunplusIT", cv2.WND_PROP_FULLSCREEN)        # Create a named window
 cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 blankScreen = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
 seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
 #-----------------------------------------------------------------------
+ap_lastworking_time = time.time()
 
 def chkWorkDay():
     if(onlyWorkDay == True):
@@ -170,6 +174,7 @@ def keyinID():
                         keyin = False
                         numChar = "200"
 
+        ap_lastworking_time = time.time()
         keyboard = cv2.imread("keyboard.png")
         cv2.putText(keyboard, numChar, (50,130), cv2.FONT_HERSHEY_SIMPLEX, 2, (0,255,0), 2)
         cv2.imshow("SunplusIT", keyboard)
@@ -315,8 +320,13 @@ def displayScreen(img=None, overlay=None):
     #cv2.waitKey(1)
 
 def blackScreen():
+    #if(time.time()-ap_lastworking_time > screen_saver_time):
+    #    screen = cv2.imread("black.jpg")
+        #logging.info("Enter sleep screen mode.")
+    #else:
     cameraArea = imutils.resize(np.hstack((blankScreen, seperateBLock, blankScreen )), width=800)
     screen = displayScreen(cameraArea, (0,95))
+
     return screen
 
 #def printText(text=None, color=(0,0,0)):
@@ -365,12 +375,12 @@ def matchFace(this_ID=None):
     tmpPic2 = blankScreen.copy()
 
     camOK = True
-    cam1 = webCam(id=0, size=webcam_size)
+    cam1 = webCam(id=1, size=webcam_size)
     if(cam1.working() is False):
         camOK = False
         logging.error("Web camera #1 is not working!")
 
-    cam2 = webCam(id=1, size=webcam_size)
+    cam2 = webCam(id=0, size=webcam_size)
     if(cam2.working() is False):
         camOK = False
         logging.error("Web camera #2 is not working!")
@@ -404,6 +414,8 @@ def matchFace(this_ID=None):
     captureStart = time.time()
     while (faceCam1 is False) or (faceCam2 is False):
         #print(time.time() - captureStart)
+        ap_lastworking_time = time.time()
+
         if(time.time() - captureStart > captureTime):
             #print("Time limit")
             screen = displayScreen(None, None)
@@ -436,22 +448,34 @@ def matchFace(this_ID=None):
 
             centerX = 0
             centerY = 0
-            imgCenterX = webcam_size[0] / 2
-            imgCenterY = webcam_size[1] / 2
+            imgCenterX = int(webcam_size[0] / 2)
+            imgCenterY = int(webcam_size[1] / 2)
             if(len(bbox1)>0):
                 if( bbox1[0][2]>minFaceSize1[0] and bbox1[0][3]>minFaceSize1[1]):
-                    centerX = bbox1[0][0] +  bbox1[0][2]/2
-                    centerY = bbox1[0][1] +  bbox1[0][3]/2
+                    centerX = int(bbox1[0][0] +  bbox1[0][2]/2)
+                    centerY = int(bbox1[0][1] +  bbox1[0][3]/2)
 
                     #if((centerX<imgCenterX+offsetFaceBox[0] and centerX>imgCenterX-offsetFaceBox[0]) and (centerY<imgCenterY+offsetFaceBox[1] or centerY>imgCenterY-offsetFaceBox[1])):
+                    for (x,y,w,h) in bbox1:
+                        cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),3)
+
                     if (time.time()-captureStart) > wait_to_detectFace:
-                        faceCam1 = True
                         faceArea1 = pic1[bbox1[0][1]:bbox1[0][1]+bbox1[0][3],bbox1[0][0]:bbox1[0][0]+bbox1[0][2]]
-                        cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + "-face.jpg", faceArea1)
-                        cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
-                        logging.debug("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
-                        for (x,y,w,h) in bbox1:
-                            cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),3)
+                        #for (x,y,w,h) in bbox1:
+                        #     cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),3)
+
+                        gray = cv2.cvtColor(faceArea1, cv2.COLOR_BGR2GRAY)
+                        blur_rate = cv2.Laplacian(gray, cv2.CV_64F).var()
+                        cv2.putText(tmpPic1, "clear: {:.1f}".format(blur_rate), (10, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+                        if(blur_rate>blurRate):
+                            faceCam1 = True
+                            #faceArea1 = pic1[bbox1[0][1]:bbox1[0][1]+bbox1[0][3],bbox1[0][0]:bbox1[0][0]+bbox1[0][2]]
+                            cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + "-face.jpg", faceArea1)
+                            cv2.imwrite(historyPicPath + "cam0/" + str(time.time()) + ".jpg", pic1)
+                            logging.debug("write to:", historyPicPath + "cam0/" + str(time.time()) + ".jpg")
+                            #for (x,y,w,h) in bbox1:
+                            #    cv2.rectangle( tmpPic1,(x,y),(x+w,y+h),(0,255,0),3)
 
         okPic2, pic2 = cam2.takepic(rotate=cam2_rotate, vflip=False, hflip=True, resize=None, savePath=None)
         #print("pic2:", pic2.shape)
@@ -476,15 +500,24 @@ def matchFace(this_ID=None):
 
             if(len(bbox2)>0):
                 if(bbox2[0][2]>minFaceSize2[0] and bbox2[0][3]>minFaceSize2[1]):
-                    faceCam2 = True
-                    if(faceCam1 == True):
-                        faceArea2 = pic2[bbox2[0][1]:bbox2[0][1]+bbox2[0][3],bbox2[0][0]:bbox2[0][0]+bbox2[0][2]]
-                        cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + "-face.jpg", faceArea2)
-                        cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + ".jpg", pic2 )
-                        logging.debug("write to:", historyPicPath + "cam1/" + str(time.time()) + ".jpg")
+                    centerX = int(bbox2[0][0] +  bbox2[0][2]/2)
+                    centerY = int(bbox2[0][1] +  bbox2[0][3]/2)
+
                     for (x,y,w,h) in bbox2:
                         cv2.rectangle( tmpPic2,(x,y),(x+w,y+h),(0,255,0),3)
-            
+
+                    faceArea2 = pic2[bbox2[0][1]:bbox2[0][1]+bbox2[0][3],bbox2[0][0]:bbox2[0][0]+bbox2[0][2]]
+                    gray = cv2.cvtColor(faceArea2, cv2.COLOR_BGR2GRAY)
+                    blur_rate = cv2.Laplacian(gray, cv2.CV_64F).var()
+                    cv2.putText(tmpPic2, "clear: {:.1f}".format(blur_rate), (10, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+                    if(blur_rate>blurRate):
+                        faceCam2 = True
+                        if(faceCam1 == True):
+                            cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + "-face.jpg", faceArea2)
+                            cv2.imwrite(historyPicPath + "cam1/" + str(time.time()) + ".jpg", pic2 )
+                            logging.debug("write to:", historyPicPath + "cam1/" + str(time.time()) + ".jpg")
+
         #print(tmpPic1.shape, seperateBLock.shape, tmpPic2.shape)
         #tmpPic1 = imutils.resize(tmpPic1, height=280)
         #tmpPic2 = imutils.resize(tmpPic2, height=280)
@@ -593,11 +626,10 @@ cv2.waitKey(1)
 
 while True:
     clickCheckin = GPIO.input(btnCheckin)
-    print("Click", clickCheckin)
     idList = None
     if(clickCheckin == 0):
         if(chkWorkDay() == True):
-
+            ap_lastworking_time = time.time()
             logging.info(datetime.datetime.now())
             os.system('/usr/bin/aplay ' + WAV_FOLDER + 'welcomeuse.wav')
 
@@ -706,4 +738,6 @@ while True:
             os.system('/usr/bin/aplay ' + WAV_FOLDER + 'workday.wav')
 
     else:
+        screen = blackScreen()
+        cv2.imshow("SunplusIT", screen )
         cv2.waitKey(1)
