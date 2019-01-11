@@ -20,7 +20,7 @@ import requests
 
 faceDetect = "cascade"  #dlib / cascade / mtcnn / mtcnn2
 
-Need_KeyInID = False
+#Need_KeyInID = False
 onlyWorkDay = True
 notWorkDay = [ "2/4", "2/5", "2/6", "2/7", "2/8", "2/28", "3/1", "4/4", "4/5", "5/1", "6/7", "9/13", "10/10", "10/11" ]
 runMode = 2  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
