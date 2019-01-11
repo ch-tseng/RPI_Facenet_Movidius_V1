@@ -3,22 +3,8 @@
 
 import RPi.GPIO as GPIO 
 GPIO.setmode(GPIO.BCM)
-
 import logging
 from mvnc import mvncapi as mvnc
-
-faceDetect = "cascade"  #dlib / cascade / mtcnn / mtcnn2
-
-if(faceDetect=="dlib"):
-    import dlib
-    detector = dlib.get_frontal_face_detector()
-elif(faceDetect=="mtcnn"):
-    from mtcnn.mtcnn import MTCNN
-    detector = MTCNN()
-elif(faceDetect=="mtcnn2"):
-    from libMTCNN import faceMTCNN
-    detector = faceMTCNN()
-
 import numpy as np
 import cv2
 import imutils
@@ -28,8 +14,11 @@ import os, time
 import easygui
 from libFacialDoor import webCam
 from libFacialDoor import facenetVerify
+from libFacialDoor import mqttFACE
 import requests
-#from libFacialDoor import mqttFACE
+
+
+faceDetect = "cascade"  #dlib / cascade / mtcnn / mtcnn2
 
 Need_KeyInID = False
 onlyWorkDay = True
@@ -66,9 +55,21 @@ minFaceSize = (120,120)  #for cascade
 minFaceSize1 = (120, 120)  #cam0 臉部area最小不可低於
 minFaceSize2 = (90, 90)  #cam1 臉部area最小不可低於
 dlib_detectorRatio = 0
-#screen_saver_time = 300
-
 posturl="http://api.sunplusit.com/api/DoorFaceDetection"
+
+#--setup --------------------------------------------------------------
+if(faceDetect=="dlib"):
+    import dlib
+    detector = dlib.get_frontal_face_detector()
+elif(faceDetect=="mtcnn"):
+    from mtcnn.mtcnn import MTCNN
+    detector = MTCNN()
+elif(faceDetect=="mtcnn2"):
+    from libMTCNN import faceMTCNN
+    detector = faceMTCNN()
+
+faceMQTT = mqttFACE("172.30.16.137", "Door-camera", 1883)
+
 GPIO.setup(btnCheckin, GPIO.IN)
 GPIO.setup(pinLight, GPIO.OUT)
 GPIO.output(pinLight,GPIO.LOW)
@@ -78,9 +79,9 @@ cv2.setWindowProperty("SunplusIT", cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN
 
 blankScreen = np.zeros((webcam_size[1], webcam_size[0], 3), dtype = "uint8")
 seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
-#-----------------------------------------------------------------------
 ap_lastworking_time = time.time()
 
+#-- functions -----------------------------------------------------------
 def chkWorkDay():
     if(onlyWorkDay == True):
         today = datetime.datetime.today()
@@ -583,13 +584,16 @@ def doorAction(openDoor, peopleID, camFace1, camFace2, screen):
     global runMode
 
     if(openDoor is True):
+        faceMQTT.sendMQTT('{ "EmpCName":"facial-door", "DeptNo":"facial-door", "EmpNo":"'+str(peopleID)+'", "Uid":"'+str(peopleID)+'", "TagType":"E", "People":"1", "Time":"2019" }' )
+
         logging.info("Send to webserver: peopleID={}, openDoor={}".format(str(peopleID), openDoor))
-        callWebServer(str(peopleID), camFace1, camFace2, openDoor)
+        #callWebServer(str(peopleID), camFace1, camFace2, openDoor)
         cv2.putText(screen, "Your ID is {}, your are verified!".format(peopleID), (20, 450), cv2.FONT_HERSHEY_COMPLEX, 1.2, (255,0,0), 2)
         cv2.imshow("SunplusIT", screen )
         cv2.waitKey(1)
         id = str(peopleID)
         #readNumber(id[3:len(id)])
+        callWebServer(str(peopleID), camFace1, camFace2, openDoor)
         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'opendoor.wav')
 
         for adm in adm_users:
