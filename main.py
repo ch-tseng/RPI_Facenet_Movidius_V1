@@ -16,11 +16,12 @@ from libFacialDoor import webCam
 from libFacialDoor import facenetVerify
 from libFacialDoor import mqttFACE
 import requests
-
+import random
 
 faceDetect = "cascade"  #dlib / cascade / mtcnn / mtcnn2
 
 #Need_KeyInID = False
+#cameraList = (0, 1)  #you can change the list to [1,0] if cam0 is not the first camera
 onlyWorkDay = True
 notWorkDay = [ "2/4", "2/5", "2/6", "2/7", "2/8", "2/28", "3/1", "4/4", "4/5", "5/1", "6/7", "9/13", "10/10", "10/11" ]
 runMode = 2  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
@@ -45,7 +46,7 @@ wait_to_detectFace = 6  #等待幾秒再開始detect face, 免得還沒準備好
 offsetFaceBox = (10,10)  #拍照時,cam0的中心要在紅框中間多大的距離內
 captureTime = 60  #拍照時間超過幾秒沒有動作,則回到等待狀態
 blurRate = 120  # higher is more clear, lower is more blurly
-previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
+#previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
 face_cascade = cv2.CascadeClassifier('cascade/haarcascade_frontalface_default.xml')
@@ -82,6 +83,22 @@ seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
 ap_lastworking_time = time.time()
 
 #-- functions -----------------------------------------------------------
+def speakWelcome():
+    now = datetime.datetime.now()
+    logging.info("Welcome {} .....".format(datetime.datetime.now()))
+    randNum = str(random.randint(0,5))
+
+    if(now.hour<=10 and now.hour>=5):
+        os.system('/usr/bin/aplay ' + WAV_FOLDER + 'welcome_a' + randNum + '.wav')  #Good morning
+    elif(now.hour>=12 and now.hour<=16):
+        os.system('/usr/bin/aplay ' + WAV_FOLDER + 'welcome_b' + randNum + '.wav')
+    elif(now.hour==17 and (now.minute<=59 and now.minute>=30)):
+        os.system('/usr/bin/aplay ' + WAV_FOLDER + 'welcome_c' + randNum + '.wav')
+    elif(now.hour>=18 and now.hour<=21):
+        os.system('/usr/bin/aplay ' + WAV_FOLDER + 'welcome_d' + randNum + '.wav')
+    else:
+        os.system('/usr/bin/aplay ' + WAV_FOLDER + 'welcome.wav')
+
 def chkWorkDay():
     if(onlyWorkDay == True):
         today = datetime.datetime.today()
@@ -199,15 +216,15 @@ def createEnv():
         os.makedirs(validPicPath)
         logging.info("Pics for valid path created:", validPicPath)
 
-    if not os.path.exists(previewPicPath):
-        os.makedirs(previewPicPath)
-        logging.info("Pics for preview path created:", previewPicPath)
-    if not os.path.exists(previewPicPath+"/cam0"):
-        os.makedirs(previewPicPath+"/cam0")
-        logging.info("Pics for preview path created:", previewPicPath+"/cam0")
-    if not os.path.exists(previewPicPath+"/cam1"):
-        os.makedirs(previewPicPath+"/cam1")
-        logging.info("Pics for preview path created:", previewPicPath+"/cam1")
+    #if not os.path.exists(previewPicPath):
+    #    os.makedirs(previewPicPath)
+    #    logging.info("Pics for preview path created:", previewPicPath)
+    #if not os.path.exists(previewPicPath+"/cam0"):
+    #    os.makedirs(previewPicPath+"/cam0")
+    #    logging.info("Pics for preview path created:", previewPicPath+"/cam0")
+    #if not os.path.exists(previewPicPath+"/cam1"):
+    #    os.makedirs(previewPicPath+"/cam1")
+    #    logging.info("Pics for preview path created:", previewPicPath+"/cam1")
 
     if not os.path.exists(historyPicPath):
         os.makedirs(historyPicPath)
@@ -307,18 +324,17 @@ def chkID(id):
             return False
 
 def displayScreen(img=None, overlay=None):
-    board = cv2.imread("board.png")
+    if(runMode==0):
+        board = cv2.imread("board_manage.png")
+    else:
+        board = cv2.imread("board.png")
+
     if(img is not None and overlay is not None):
         y_offset = overlay[1]
         x_offset = overlay[0]
         board[y_offset:y_offset+img.shape[0], x_offset:x_offset+img.shape[1]] = img
 
-    if(runMode==0):
-        cv2.putText(board, "Management mode", (50, 50), cv2.FONT_HERSHEY_COMPLEX, 2, (0,0,255), 2)
-
     return board
-    #cv2.imshow("SunplusIT", board )
-    #cv2.waitKey(1)
 
 def blackScreen():
     #if(time.time()-ap_lastworking_time > screen_saver_time):
@@ -376,12 +392,12 @@ def matchFace(this_ID=None):
     tmpPic2 = blankScreen.copy()
 
     camOK = True
-    cam1 = webCam(id=1, size=webcam_size)
+    cam1 = webCam(id=0, size=webcam_size)
     if(cam1.working() is False):
         camOK = False
         logging.error("Web camera #1 is not working!")
 
-    cam2 = webCam(id=0, size=webcam_size)
+    cam2 = webCam(id=1, size=webcam_size)
     if(cam2.working() is False):
         camOK = False
         logging.error("Web camera #2 is not working!")
@@ -634,11 +650,12 @@ while True:
     if(clickCheckin == 0):
         if(chkWorkDay() == True):
             ap_lastworking_time = time.time()
-            logging.info(datetime.datetime.now())
-            os.system('/usr/bin/aplay ' + WAV_FOLDER + 'welcomeuse.wav')
+            speakWelcome()
+            #logging.info("Welcome {} .....".format(datetime.datetime.now()))
+            #os.system('/usr/bin/aplay ' + WAV_FOLDER + 'welcomeuse.wav')
 
             if(runMode == 0 or runMode == 1 or runMode == 2):
-                os.system('/usr/bin/aplay ' + WAV_FOLDER + 'inputid.wav')
+                #os.system('/usr/bin/aplay ' + WAV_FOLDER + 'inputid.wav')
                 #peopleID = easygui.integerbox('請輸入您的工號（六碼）：', '工號輸入', lowerbound=200000, upperbound=212000)
                 peopleID = keyinID()
                 #print(peopleID)
