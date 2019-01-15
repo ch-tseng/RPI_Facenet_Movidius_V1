@@ -17,7 +17,7 @@ from libFacialDoor import facenetVerify
 from libFacialDoor import mqttFACE
 import requests
 import random
-from pynput.mouse import Button, Controller
+#from pynput.mouse import Button, Controller
 
 faceDetect = "cascade"  #dlib / cascade / mtcnn / mtcnn2
 
@@ -35,6 +35,7 @@ FACE_MATCH_THRESHOLD_cam0 = 0.35  #cam0 的分數要低於多少才算通過辨�
 FACE_MATCH_THRESHOLD_cam1 = 0.35  #cam1 的分數要低於多少才算通過辨識
 FACE_MATCH_THRESHOLD_avg = 0.35 #cam0+cam1 的平均分數要低於多少才算通過辨識
 
+screen_saver_time = 300
 #webcam_size = ( 352,288)
 webcam_size = ( 640,480)
 cam1_rotate = 0
@@ -84,9 +85,11 @@ seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
 ap_lastworking_time = time.time()
 
 #-- functions -----------------------------------------------------------
-def screen_wakeup():
-    mouse = Controller()
-    mouse.move(5, -5)
+#def screen_wakeup():
+#    mouse = Controller()
+#    mouse.position(5, 5)
+#    mouse.press(Button.left)
+#    mouse.release(Button.left)
 
 def speakWelcome():
     now = datetime.datetime.now()
@@ -342,12 +345,12 @@ def displayScreen(img=None, overlay=None):
     return board
 
 def blackScreen():
-    #if(time.time()-ap_lastworking_time > screen_saver_time):
-    #    screen = cv2.imread("black.jpg")
-        #logging.info("Enter sleep screen mode.")
-    #else:
-    cameraArea = imutils.resize(np.hstack((blankScreen, seperateBLock, blankScreen )), width=800)
-    screen = displayScreen(cameraArea, (0,95))
+    if(time.time()-ap_lastworking_time > screen_saver_time):
+        screen = cv2.imread("black.jpg")
+        logging.info("Enter sleep screen mode.")
+    else:
+        cameraArea = imutils.resize(np.hstack((blankScreen, seperateBLock, blankScreen )), width=800)
+        screen = displayScreen(cameraArea, (0,95))
 
     return screen
 
@@ -654,7 +657,7 @@ while True:
     idList = None
     if(clickCheckin == 0):
         if(chkWorkDay() == True):
-            screen_wakeup()
+            #screen_wakeup()
             ap_lastworking_time = time.time()
             speakWelcome()
             #logging.info("Welcome {} .....".format(datetime.datetime.now()))
