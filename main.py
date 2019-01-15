@@ -85,7 +85,8 @@ ap_lastworking_time = time.time()
 
 #-- functions -----------------------------------------------------------
 def screen_wakeup():
-    pygame.mouse.set_pos((random.choice(range(600)), random.choice(range(600))))
+    mouse = Controller()
+    mouse.move(5, -5)
 
 def speakWelcome():
     now = datetime.datetime.now()
@@ -622,8 +623,6 @@ def doorAction(openDoor, peopleID, camFace1, camFace2, screen):
                 while time.time() - startTime < 10:
                     if(GPIO.input(btnCheckin)==0):
                         #GPIO.output(pinLight,GPIO.HIGH)
-                        mouse = Controller()
-                        mouse.move(5, -5)
                         logging.info("ID {} enter the adm mode.".format(peopleID))
                         runMode = 0
                         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'adm_mode.wav')
@@ -655,6 +654,7 @@ while True:
     idList = None
     if(clickCheckin == 0):
         if(chkWorkDay() == True):
+            screen_wakeup()
             ap_lastworking_time = time.time()
             speakWelcome()
             #logging.info("Welcome {} .....".format(datetime.datetime.now()))
