@@ -17,6 +17,7 @@ from libFacialDoor import facenetVerify
 from libFacialDoor import mqttFACE
 import requests
 import random
+from pynput.mouse import Button, Controller
 
 faceDetect = "cascade"  #dlib / cascade / mtcnn / mtcnn2
 
@@ -83,6 +84,9 @@ seperateBLock = np.zeros((webcam_size[1], 60, 3), dtype = "uint8")
 ap_lastworking_time = time.time()
 
 #-- functions -----------------------------------------------------------
+def screen_wakeup():
+    pygame.mouse.set_pos((random.choice(range(600)), random.choice(range(600))))
+
 def speakWelcome():
     now = datetime.datetime.now()
     logging.info("Welcome {} .....".format(datetime.datetime.now()))
@@ -618,6 +622,8 @@ def doorAction(openDoor, peopleID, camFace1, camFace2, screen):
                 while time.time() - startTime < 10:
                     if(GPIO.input(btnCheckin)==0):
                         #GPIO.output(pinLight,GPIO.HIGH)
+                        mouse = Controller()
+                        mouse.move(5, -5)
                         logging.info("ID {} enter the adm mode.".format(peopleID))
                         runMode = 0
                         os.system('/usr/bin/aplay ' + WAV_FOLDER + 'adm_mode.wav')
