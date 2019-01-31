@@ -22,7 +22,7 @@ import random
 faceDetect = "cascade"  #dlib / cascade / mtcnn / mtcnn2
 
 #Need_KeyInID = False
-#cameraList = (0, 1)  #you can change the list to [1,0] if cam0 is not the first camera
+cameraList = (1, 0)  #you can change the list to [1,0] if cam0 is not the first camera
 onlyWorkDay = True
 notWorkDay = [ "2/4", "2/5", "2/6", "2/7", "2/8", "2/28", "3/1", "4/4", "4/5", "5/1", "6/7", "9/13", "10/10", "10/11" ]
 runMode = 2  # 0--> enter ID, and add this employee  1--> enter ID and scan all employess to check  2--> enter ID and check only the ID  3--> do not need to enter ID
@@ -47,7 +47,7 @@ adm_users = [200999]
 wait_to_detectFace = 6  #等待幾秒再開始detect face, 免得還沒準備好就拍了
 offsetFaceBox = (10,10)  #拍照時,cam0的中心要在紅框中間多大的距離內
 captureTime = 60  #拍照時間超過幾秒沒有動作,則回到等待狀態
-blurRate = 120  # higher is more clear, lower is more blurly
+blurRate = 180  # higher is more clear, lower is more blurly
 #previewPicPath = topDIR+"preview/"  #all pics face size is not pass the required size
 historyPicPath = topDIR+"history/"   #for those face is pass the required size and will be check
 validPicPath = topDIR+"valid/"
@@ -347,7 +347,7 @@ def displayScreen(img=None, overlay=None):
 def blackScreen():
     if(time.time()-ap_lastworking_time > screen_saver_time):
         screen = cv2.imread("black.jpg")
-        logging.info("Enter sleep screen mode.")
+        #logging.info("Enter sleep screen mode.")
     else:
         cameraArea = imutils.resize(np.hstack((blankScreen, seperateBLock, blankScreen )), width=800)
         screen = displayScreen(cameraArea, (0,95))
@@ -400,12 +400,12 @@ def matchFace(this_ID=None):
     tmpPic2 = blankScreen.copy()
 
     camOK = True
-    cam1 = webCam(id=0, size=webcam_size)
+    cam1 = webCam(id=cameraList[0], size=webcam_size)
     if(cam1.working() is False):
         camOK = False
         logging.error("Web camera #1 is not working!")
 
-    cam2 = webCam(id=1, size=webcam_size)
+    cam2 = webCam(id=cameraList[1], size=webcam_size)
     if(cam2.working() is False):
         camOK = False
         logging.error("Web camera #2 is not working!")
@@ -674,95 +674,100 @@ while True:
                 peopleID = 0
 
             if((peopleID == 0 and runMode==3) or (peopleID !=0 and runMode!=3)):
-                #if(chkID(peopleID) == True
-                (camFace1, faceArea1), (camFace2, faceArea2), idList, idYN, idScore, screen = matchFace(this_ID=str(peopleID))
-                GPIO.output(pinLight,GPIO.LOW)
-
-                if(idList is not None):
-                    chkList = []
-                    i = 0
-                    for id in idList:
-                        logging.debug(idList[i], idYN[i], idScore[i])
-
-                        if(idYN[i][0] is True and idYN[i][1] is True):
-                            chkList.append((idList[i], (idScore[i][0] + idScore[i][1])/2))
-                            logging.info("      ---> scores are all pass, added to chkList.")
-                        i += 1
-
-                    logging.info("Final pass list:")
-                    logging.info(chkList)
-
-                    openDoor = False
-
-
-                    if(runMode==1 or runMode==2):
-                        for id, score in chkList:
-                            if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
-                                openDoor = True
-                                logging.info("   --->Pass, id is {}, score is {}".format(id, score))
-
-
-                    elif(runMode==3):
-                        peopleID = 0
-                        if(len(chkList)>0):
-                            smallist = 999
-                            for id, (ID, score) in enumerate(chkList):
-                                if(score<smallist):
-                                    smallist = score
-                                    peopleID = str(ID)
-
-                            if(smallist<FACE_MATCH_THRESHOLD_avg):
-                                openDoor = True
-
-                    doorAction(openDoor, peopleID, camFace1, camFace2, screen)
-
-                    screen = blackScreen()
-                    cv2.imshow("SunplusIT", screen )
-                    cv2.waitKey(1)
-
-
+                if(peopleID == 200999 and runMode==0):
+                    runMode = 2
+                    logging.info("User keyin the admin id to exit:", peopleID)
+                    os.system('/usr/bin/aplay ' + WAV_FOLDER + 'punch_mode.wav')
                 else:
-                    if(runMode == 0 and camFace1 is not None):  #add the new user
-                        filename = str(time.time()) + ".jpg"
+                    (camFace1, faceArea1), (camFace2, faceArea2), idList, idYN, idScore, screen = matchFace(this_ID=str(peopleID))
+                    GPIO.output(pinLight,GPIO.LOW)
 
-                        if(chkID(peopleID) is True):
-                            os.rename(validPicPath+str(peopleID)+"/cam0/valid.jpg", validPicPath+str(peopleID)+"/cam0/valid_"+filename)
-                            os.rename(validPicPath+str(peopleID)+"/cam1/valid.jpg", validPicPath+str(peopleID)+"/cam1/valid_"+filename)
+                    if(idList is not None):
+                        chkList = []
+                        i = 0
+                        for id in idList:
+                            logging.debug(idList[i], idYN[i], idScore[i])
 
-                        regID(str(peopleID), faceArea1, faceArea2)
+                            if(idYN[i][0] is True and idYN[i][1] is True):
+                                chkList.append((idList[i], (idScore[i][0] + idScore[i][1])/2))
+                                logging.info("      ---> scores are all pass, added to chkList.")
+                            i += 1
 
-                        cv2.imwrite(historyPicPath+str(peopleID)+"/cam0/"+filename, camFace1)
-                        cv2.imwrite(historyPicPath+str(peopleID)+"/cam1/"+filename, camFace2)
-                        #cv2.imwrite(validPicPath+str(peopleID)+"/cam0/valid.jpg", faceArea1)
-                        #cv2.imwrite(validPicPath+str(peopleID)+"/cam1/valid.jpg"+filename, faceArea2)
-                        os.system('/usr/bin/aplay ' + WAV_FOLDER + 'photo_saved.wav')
+                        logging.info("Final pass list:")
+                        logging.info(chkList)
 
-                        
-                        for adm in adm_users:
-                            if(peopleID == adm):
-                                startTime = time.time()
-                                while time.time() - startTime < 10:
-                                    if(GPIO.input(btnCheckin)==0):
-                                        runMode = 2
-                                        logging.info("ID {} exit from the adm mode.".format(peopleID))
-                                        os.system('/usr/bin/aplay ' + WAV_FOLDER + 'punch_mode.wav')
-                                        break
+                        openDoor = False
+
+
+                        if(runMode==1 or runMode==2):
+                            for id, score in chkList:
+                                if(int(id) == peopleID and score<FACE_MATCH_THRESHOLD_avg):
+                                    openDoor = True
+                                    logging.info("   --->Pass, id is {}, score is {}".format(id, score))
+
+
+                        elif(runMode==3):
+                            peopleID = 0
+                            if(len(chkList)>0):
+                                smallist = 999
+                                for id, (ID, score) in enumerate(chkList):
+                                    if(score<smallist):
+                                        smallist = score
+                                        peopleID = str(ID)
+
+                                if(smallist<FACE_MATCH_THRESHOLD_avg):
+                                    openDoor = True
+
+                        doorAction(openDoor, peopleID, camFace1, camFace2, screen)
 
                         screen = blackScreen()
                         cv2.imshow("SunplusIT", screen )
                         cv2.waitKey(1)
 
-                    elif(runMode == 2 and camFace1 is not None):
-                        doorAction(False, peopleID, camFace1, camFace2, screen)
-
-                        screen = blackScreen()
-                        cv2.imshow("SunplusIT", screen )
-                        cv2.waitKey(1)
 
                     else:
-                        screen = blackScreen()
-                        cv2.imshow("SunplusIT", screen )
-                        cv2.waitKey(1)
+                        if(runMode == 0 and camFace1 is not None):  #add the new user
+                            filename = str(time.time()) + ".jpg"
+
+                            if(peopleID!=200999):
+                                if(chkID(peopleID) is True):
+                                    os.rename(validPicPath+str(peopleID)+"/cam0/valid.jpg", validPicPath+str(peopleID)+"/cam0/valid_"+filename)
+                                    os.rename(validPicPath+str(peopleID)+"/cam1/valid.jpg", validPicPath+str(peopleID)+"/cam1/valid_"+filename)
+
+                                regID(str(peopleID), faceArea1, faceArea2)
+
+                            cv2.imwrite(historyPicPath+str(peopleID)+"/cam0/"+filename, camFace1)
+                            cv2.imwrite(historyPicPath+str(peopleID)+"/cam1/"+filename, camFace2)
+                            #cv2.imwrite(validPicPath+str(peopleID)+"/cam0/valid.jpg", faceArea1)
+                            #cv2.imwrite(validPicPath+str(peopleID)+"/cam1/valid.jpg"+filename, faceArea2)
+                            os.system('/usr/bin/aplay ' + WAV_FOLDER + 'photo_saved.wav')
+
+                        
+                            for adm in adm_users:
+                                if(peopleID == adm):
+                                    startTime = time.time()
+                                    while time.time() - startTime < 10:
+                                        if(GPIO.input(btnCheckin)==0):
+                                            runMode = 2
+                                            logging.info("ID {} exit from the adm mode.".format(peopleID))
+                                            os.system('/usr/bin/aplay ' + WAV_FOLDER + 'punch_mode.wav')
+                                            break
+
+                            screen = blackScreen()
+                            cv2.imshow("SunplusIT", screen )
+                            cv2.waitKey(1)
+
+                        elif(runMode == 2 and camFace1 is not None):
+                            doorAction(False, peopleID, camFace1, camFace2, screen)
+
+                            screen = blackScreen()
+                            cv2.imshow("SunplusIT", screen )
+                            cv2.waitKey(1)
+
+                        else:
+                            screen = blackScreen()
+                            cv2.imshow("SunplusIT", screen )
+                            cv2.waitKey(1)
 
         else:
             os.system('/usr/bin/aplay ' + WAV_FOLDER + 'workday.wav')
